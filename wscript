@@ -2,7 +2,7 @@ import os, subprocess
 
 def options(opt):
     opt.load(['compiler_cxx', 'gnu_dirs'])
-    opt.load(['cxx17', 'boost', 'gmpxx', 'mpfr', 'elemental', 'libxml2', 'rapidjson', 'libarchive'],
+    opt.load(['cxx17', 'boost', 'gmpxx', 'mpfr', 'elemental', 'libxml2', 'rapidjson', 'libarchive', 'flint', 'openblas'],
              tooldir='./waf-tools')
 
 def configure(conf):
@@ -10,7 +10,7 @@ def configure(conf):
         conf.environ['CXX']='mpicxx'
 
     conf.load(['compiler_cxx','gnu_dirs','cxx17','boost','gmpxx','mpfr',
-               'elemental','libxml2', 'rapidjson', 'libarchive'])
+               'elemental', 'libxml2', 'rapidjson', 'libarchive', 'flint', 'openblas'])
     conf.load('clang_compilation_database', tooldir='./waf-tools')
 
     conf.env.git_version = subprocess.check_output('git describe --always --dirty', universal_newlines=True,
@@ -19,10 +19,18 @@ def configure(conf):
 def build(bld):
     default_flags = ['-Wall', '-Wextra', '-O3']
     default_defines = ['OMPI_SKIP_MPICXX', 'SDPB_VERSION_STRING="' + bld.env.git_version + '"']
-    use_packages = ['cxx17', 'gmpxx', 'mpfr', 'boost', 'elemental', 'libxml2', 'rapidjson', 'libarchive']
+    use_packages = ['cxx17', 'gmpxx', 'mpfr', 'boost', 'elemental', 'libxml2', 'rapidjson', 'libarchive', 'openblas']
     default_includes = ['src', 'external']
     # TODO use default_includes for all targets and simplify #include directives
     # e.g. #include "../../Timers.hxx" -> #include <Timers.hxx>
+
+    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx',
+                               'src/matrix_multiply/Shared_Window_Array.cxx']
+    bld.stlib(source=matrix_multiply_sources,
+              target='matrix_multiply',
+              cxxflags=default_flags,
+              default_includes=default_includes + ['flint'],
+              use=use_packages + ['flint'])
 
     sdp_solve_sources=['src/sdp_solve/Solver_Parameters/Solver_Parameters.cxx',
                        'src/sdp_solve/Solver_Parameters/ostream.cxx',
@@ -332,5 +340,16 @@ def build(bld):
                 cxxflags=default_flags,
                 defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],
                 use=use_packages + ['sdp_convert', 'sdp_solve'],
+                includes=default_includes + ['test/src']
+                )
+
+    bld.program(source=['external/catch2/catch_amalgamated.cpp',
+                        'test/src/matrix_multiply_tests/main.cxx',
+                        'test/src/matrix_multiply_tests/cases/test.cxx',
+                        ],
+                target='matrix_multiply_tests',
+                cxxflags=default_flags,
+                defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],
+                use=use_packages + ['flint', 'matrix_multiply'],
                 includes=default_includes + ['test/src']
                 )
