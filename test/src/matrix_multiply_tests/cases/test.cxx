@@ -5,6 +5,7 @@
 #include "set_stream_precision.hxx"
 #include "test_util/diff.hxx"
 #include "unit_tests/util/util.hxx"
+#include "matrix_multiply/Shared_Window_Array.hxx"
 
 #include <iostream>
 #include <vector>
@@ -535,6 +536,117 @@ namespace
   {
     output.Resize(x.Height(), y.Width());
     mat_mul_impl(output.fmpz_matrix, x.fmpz_matrix, y.fmpz_matrix);
+  }
+}
+
+TEST_CASE("MPI_Shared_Window")
+{
+  MPI_Comm comm;
+  MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
+                      &comm);
+
+  SECTION("Shared_Window_Array")
+  {
+    size_t size = 10;
+    Shared_Window_Array<double> array(comm, size);
+
+    for(size_t i = 0; i < size; ++i)
+      {
+        if(El::mpi::Rank(comm) == i % El::mpi::Size(comm))
+          array[i] = i;
+      }
+
+    El::mpi::Barrier(comm);
+    for(size_t i = 0; i < size; ++i)
+      {
+        DIFF(array[i], (double)i);
+      }
+  }
+
+  SECTION("Residue_Matrices_Window")
+  {
+    size_t num_primes = 10;
+    size_t height = 21;
+    size_t width = 32;
+
+    std::vector<El::Matrix<double>> matrices(num_primes);
+    for(size_t p = 0; p < num_primes; ++p)
+      {
+        auto &matrix = matrices.at(p);
+        matrix.Resize(height, width);
+        for(size_t i = 0; i < height; ++i)
+          for(size_t j = 0; j < width; ++j)
+            matrix(i, j) = p + 11 * i + 23 * j;
+      }
+
+    // BLAS output will be stored here
+    Residue_Matrices_Window<double> window(comm, num_primes, height, width);
+    for(size_t p = 0; p < num_primes; ++p)
+      for(size_t i = 0; i < height; ++i)
+        for(size_t j = 0; j < width; ++j)
+          {
+            if(El::mpi::Rank(comm) == (i + p + j) % El::mpi::Size(comm))
+              window.Set(p, i, j, matrices.at(p)(i, j));
+          }
+
+    El::mpi::Barrier(comm);
+
+    for(size_t p = 0; p < num_primes; ++p)
+      for(size_t i = 0; i < height; ++i)
+        for(size_t j = 0; j < width; ++j)
+          {
+            DIFF(window.Get(p, i, j), matrices.at(p)(i, j));
+            // check internal consistency:
+            DIFF(window.Get(p, i, j), window.matrices.at(p)(i, j));
+          }
+  }
+
+  SECTION("Block_Residue_Matrices_Window")
+  {
+    size_t num_primes = 10;
+    size_t num_blocks = 21;
+    size_t width = 32;
+
+    std::vector<std::vector<El::Matrix<double>>> block_residues(num_primes);
+    std::vector<size_t> block_heights(num_blocks);
+    for(size_t b = 0; b < num_blocks; ++b)
+      {
+        block_heights.at(b) = width + b; // to make heights different
+      }
+
+    Block_Residue_Matrices_Window<double> window(comm, num_primes, num_blocks,
+                                                 block_heights, width);
+    for(size_t p = 0; p < num_primes; ++p)
+      {
+        block_residues.at(p).resize(num_blocks);
+        for(size_t b = 0; b < num_blocks; ++b)
+          {
+            auto &matrix = block_residues.at(p).at(b);
+            size_t height = block_heights.at(b);
+            matrix.Resize(height, width);
+            for(size_t i = 0; i < height; ++i)
+              {
+                for(size_t j = 0; j < width; ++j)
+                  {
+                    matrix(i, j) = p + b * 10 + i * 100 + j * 1001;
+                    if(El::mpi::Rank(comm)
+                       == (p + b + i + j) % El::mpi::Size(comm))
+                      window.Set(p, b, i, j, matrix(i, j));
+                  }
+              }
+          }
+      }
+
+    El::mpi::Barrier(comm);
+
+    //    DIFF(window.blocks_residues,block_residues); // TODO compile error
+    for(size_t p = 0; p < num_primes; ++p)
+      {
+        for(size_t b = 0; b < num_blocks; ++b)
+          {
+            DIFF(window.blocks_residues[p][b], block_residues[p][b]);
+          }
+      }
   }
 }
 

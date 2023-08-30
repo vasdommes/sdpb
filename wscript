@@ -24,8 +24,7 @@ def build(bld):
     # TODO use default_includes for all targets and simplify #include directives
     # e.g. #include "../../Timers.hxx" -> #include <Timers.hxx>
 
-    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx',
-                               'src/matrix_multiply/Shared_Window_Array.cxx']
+    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx']
     bld.stlib(source=matrix_multiply_sources,
               target='matrix_multiply',
               cxxflags=default_flags,

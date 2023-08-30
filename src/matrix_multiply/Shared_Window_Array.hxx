@@ -72,7 +72,7 @@ public:
   // and can share memory.
   Shared_Memory_Matrix(MPI_Comm shared_memory_comm, int height, int width)
       : data(shared_memory_comm, height * width),
-        matrix(height, width, data, height)
+        matrix(height, width, data.data, height)
   {}
 
   T *Buffer() { return data; }
@@ -96,22 +96,22 @@ private:
   std::vector<size_t> accumulated_heights;
 
 public:
-  const size_t primes_size;
-  const size_t blocks_size;
+  const size_t num_primes;
+  const size_t num_blocks;
   const std::vector<size_t> block_heights;
   const size_t block_width;
   // TODO
   std::vector<std::vector<El::Matrix<T>>> blocks_residues;
 
   Block_Residue_Matrices_Window() = delete;
-  Block_Residue_Matrices_Window(MPI_Comm shared_memory_comm,
-                                size_t primes_size, size_t blocks_size,
+  Block_Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
+                                size_t num_blocks,
                                 const std::vector<size_t> &block_heights,
                                 size_t block_width)
       : data(shared_memory_comm,
-             primes_size * TotalResidueHeight(block_heights) * block_width),
-        primes_size(primes_size),
-        blocks_size(blocks_size),
+             num_primes * TotalResidueHeight(block_heights) * block_width),
+        num_primes(num_primes),
+        num_blocks(num_blocks),
         block_heights(block_heights),
         block_width(block_width)
   {
@@ -120,12 +120,12 @@ public:
                      accumulated_heights.begin());
 
     // TODO do we need it?
-    blocks_residues.resize(primes_size);
+    blocks_residues.resize(num_primes);
     size_t block_offset = 0;
-    for(size_t prime = 0; prime < primes_size; ++prime)
+    for(size_t prime = 0; prime < num_primes; ++prime)
       {
-        blocks_residues.at(prime).resize(blocks_size);
-        for(size_t block = 0; block < blocks_size; ++block)
+        blocks_residues.at(prime).resize(num_blocks);
+        for(size_t block = 0; block < num_blocks; ++block)
           {
             El::Matrix<T> &matrix = blocks_residues.at(prime).at(block);
             auto height = block_heights.at(block);
@@ -141,14 +141,14 @@ public:
   {
     auto prev_heights
       = block_index == 0 ? 0 : accumulated_heights[block_index - 1];
-    auto total_height = accumulated_heights[block_index];
+    auto total_height = accumulated_heights[num_blocks - 1];
     return prime_index * total_height * block_width
            + block_index * prev_heights * block_width + i + j * block_width;
   }
   double Get(size_t prime_index, size_t block_index, size_t i, size_t j)
   {
     return blocks_residues.at(prime_index).at(block_index).Get(i, j);
-    //    return data[GetIndex(prime_index, block_index, i, j)];
+    //        return data[GetIndex(prime_index, block_index, i, j)];
   }
   void
   Set(size_t prime_index, size_t block_index, size_t i, size_t j, double value)
@@ -159,7 +159,7 @@ public:
 
   [[nodiscard]] size_t PrimeStride() const
   {
-    return block_width * accumulated_heights[blocks_size - 1];
+    return block_width * accumulated_heights[num_blocks - 1];
   }
 
 private:
@@ -170,6 +170,7 @@ private:
 };
 
 // Vector of matrices stored in a contiguous Shared_Window_Array
+// This is residues of Q (BLAS multiplication output is written to there)
 template <class T> class Residue_Matrices_Window : boost::noncopyable
 {
 private:
