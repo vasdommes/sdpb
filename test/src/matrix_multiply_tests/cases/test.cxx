@@ -2,10 +2,13 @@
 
 #include "matrix_multiply/Fmpz_Matrix.hxx"
 #include "matrix_multiply/Normalized_Matrix.hxx"
+#include "matrix_multiply/Primes.hxx"
 #include "set_stream_precision.hxx"
 #include "test_util/diff.hxx"
 #include "unit_tests/util/util.hxx"
 #include "matrix_multiply/Shared_Window_Array.hxx"
+#include "matrix_multiply/matrix_multiply.hxx"
+#include "sdp_solve/Block_Info.hxx"
 
 #include <iostream>
 #include <vector>
@@ -25,7 +28,7 @@
 using Test_Util::REQUIRE_Equal::diff;
 
 // code copied from flint mul_blas.c
-namespace Primes
+namespace PrimesNS
 {
 #define MAX_BLAS_DP_INT (UWORD(1) << 53)
 
@@ -182,7 +185,9 @@ namespace Primes
   // We convert it to ordinary Fmpz_Matrix
   // We want to calculate residues and write them to a shared memory window,
   // which is an array of doubles
-  // Get_value(window, prime, block, i,j) := window[ j + width*i + width*sum(block heights for block_id < block) + width*sum(block heights) * prime]
+  // Get_value(window, prime, block, i,j) := window[ j + width*i +
+  // width*sum(block heights for block_id < block) + width*sum(block heights) *
+  // prime]
   //=> for fmpz_multi_mod_uint32_stride: stride = width*sum(block heights)
   std::vector<El::Matrix<double>>
   fmpz_mat_residues(const std::vector<mp_limb_t> &primes, const fmpz_mat_t x)
@@ -234,9 +239,9 @@ namespace Primes
 
     const double alpha = 1.0;
     const double beta = 0.0;
-    const double* A = x.LockedBuffer();
-    const double* B = y.LockedBuffer();
-    double* C = result.Buffer();
+    const double *A = x.LockedBuffer();
+    const double *B = y.LockedBuffer();
+    double *C = result.Buffer();
     int lda = x.LDim();
     int ldb = y.LDim();
     int ldc = result.LDim();
@@ -473,9 +478,10 @@ namespace
     to_Fmpz_Matrix(x, x_int, bit_shift);
     to_Fmpz_Matrix(y, y_int, bit_shift);
     Fmpz_Matrix result_int(x.Height(), y.Width());
-//    fmpz_mat_mul_blas(result_int.fmpz_matrix, x_int.fmpz_matrix, y_int.fmpz_matrix);
-    Primes::fmpz_mat_mul_El_double_blas(result_int.fmpz_matrix,
-                                        x_int.fmpz_matrix, y_int.fmpz_matrix);
+    //    fmpz_mat_mul_blas(result_int.fmpz_matrix, x_int.fmpz_matrix,
+    //    y_int.fmpz_matrix);
+    PrimesNS::fmpz_mat_mul_El_double_blas(
+      result_int.fmpz_matrix, x_int.fmpz_matrix, y_int.fmpz_matrix);
     // divide by 2^(2*bit_shift) because each of two int matrices should be
     // divided by 2^bit_shift
     from_Fmpz_Matrix(result_int, output, 2 * bit_shift);
@@ -536,117 +542,6 @@ namespace
   {
     output.Resize(x.Height(), y.Width());
     mat_mul_impl(output.fmpz_matrix, x.fmpz_matrix, y.fmpz_matrix);
-  }
-}
-
-TEST_CASE("MPI_Shared_Window")
-{
-  MPI_Comm comm;
-  MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
-                      &comm);
-
-  SECTION("Shared_Window_Array")
-  {
-    size_t size = 10;
-    Shared_Window_Array<double> array(comm, size);
-
-    for(size_t i = 0; i < size; ++i)
-      {
-        if(El::mpi::Rank(comm) == i % El::mpi::Size(comm))
-          array[i] = i;
-      }
-
-    El::mpi::Barrier(comm);
-    for(size_t i = 0; i < size; ++i)
-      {
-        DIFF(array[i], (double)i);
-      }
-  }
-
-  SECTION("Residue_Matrices_Window")
-  {
-    size_t num_primes = 10;
-    size_t height = 21;
-    size_t width = 32;
-
-    std::vector<El::Matrix<double>> matrices(num_primes);
-    for(size_t p = 0; p < num_primes; ++p)
-      {
-        auto &matrix = matrices.at(p);
-        matrix.Resize(height, width);
-        for(size_t i = 0; i < height; ++i)
-          for(size_t j = 0; j < width; ++j)
-            matrix(i, j) = p + 11 * i + 23 * j;
-      }
-
-    // BLAS output will be stored here
-    Residue_Matrices_Window<double> window(comm, num_primes, height, width);
-    for(size_t p = 0; p < num_primes; ++p)
-      for(size_t i = 0; i < height; ++i)
-        for(size_t j = 0; j < width; ++j)
-          {
-            if(El::mpi::Rank(comm) == (i + p + j) % El::mpi::Size(comm))
-              window.Set(p, i, j, matrices.at(p)(i, j));
-          }
-
-    El::mpi::Barrier(comm);
-
-    for(size_t p = 0; p < num_primes; ++p)
-      for(size_t i = 0; i < height; ++i)
-        for(size_t j = 0; j < width; ++j)
-          {
-            DIFF(window.Get(p, i, j), matrices.at(p)(i, j));
-            // check internal consistency:
-            DIFF(window.Get(p, i, j), window.matrices.at(p)(i, j));
-          }
-  }
-
-  SECTION("Block_Residue_Matrices_Window")
-  {
-    size_t num_primes = 10;
-    size_t num_blocks = 21;
-    size_t width = 32;
-
-    std::vector<std::vector<El::Matrix<double>>> block_residues(num_primes);
-    std::vector<size_t> block_heights(num_blocks);
-    for(size_t b = 0; b < num_blocks; ++b)
-      {
-        block_heights.at(b) = width + b; // to make heights different
-      }
-
-    Block_Residue_Matrices_Window<double> window(comm, num_primes, num_blocks,
-                                                 block_heights, width);
-    for(size_t p = 0; p < num_primes; ++p)
-      {
-        block_residues.at(p).resize(num_blocks);
-        for(size_t b = 0; b < num_blocks; ++b)
-          {
-            auto &matrix = block_residues.at(p).at(b);
-            size_t height = block_heights.at(b);
-            matrix.Resize(height, width);
-            for(size_t i = 0; i < height; ++i)
-              {
-                for(size_t j = 0; j < width; ++j)
-                  {
-                    matrix(i, j) = p + b * 10 + i * 100 + j * 1001;
-                    if(El::mpi::Rank(comm)
-                       == (p + b + i + j) % El::mpi::Size(comm))
-                      window.Set(p, b, i, j, matrix(i, j));
-                  }
-              }
-          }
-      }
-
-    El::mpi::Barrier(comm);
-
-    //    DIFF(window.blocks_residues,block_residues); // TODO compile error
-    for(size_t p = 0; p < num_primes; ++p)
-      {
-        for(size_t b = 0; b < num_blocks; ++b)
-          {
-            DIFF(window.blocks_residues[p][b], block_residues[p][b]);
-          }
-      }
   }
 }
 
@@ -874,7 +769,7 @@ TEST_CASE("bigint_matrix")
 
   SECTION("Primes")
   {
-    auto primes = Primes::calculate_primes(bits, x.Width());
+    auto primes = PrimesNS::calculate_primes(bits, x.Width());
     CAPTURE(primes);
     //    FAIL("TODO");
   }
@@ -883,8 +778,8 @@ TEST_CASE("bigint_matrix")
   {
     std::vector<mat_mul_t> mat_muls
       = {fmpz_mat_mul, fmpz_mat_mul_blas, fmpz_mat_mul_naive,
-         Primes::fmpz_mat_mul_El_double_blas,
-         Primes::fmpz_mat_mul_El_double_noblas};
+         PrimesNS::fmpz_mat_mul_El_double_blas,
+         PrimesNS::fmpz_mat_mul_El_double_noblas};
 
     std::vector<Fmpz_Matrix> results(mat_muls.size());
 
@@ -927,8 +822,8 @@ TEST_CASE("fmpz multiplication benchmark", "[!benchmark]")
   BENCHMARK_mat_mul(fmpz_mat_mul_blas);
   BENCHMARK_mat_mul(fmpz_mat_mul);
   BENCHMARK_mat_mul(fmpz_mat_mul_multi_mod);
-  BENCHMARK_mat_mul(Primes::fmpz_mat_mul_El_double_blas);
-  BENCHMARK_mat_mul(Primes::fmpz_mat_mul_El_double_noblas);
+  BENCHMARK_mat_mul(PrimesNS::fmpz_mat_mul_El_double_blas);
+  BENCHMARK_mat_mul(PrimesNS::fmpz_mat_mul_El_double_noblas);
   //  BENCHMARK_mat_mul(fmpz_mat_mul_naive);
 
 #undef BENCHMARK_mat_mul

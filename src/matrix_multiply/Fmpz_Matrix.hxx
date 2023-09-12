@@ -34,5 +34,6 @@ public:
   const fmpz *operator()(int i, int j) const;
 
   explicit Fmpz_Matrix(const El::Matrix<El::BigFloat> &input);
+  explicit Fmpz_Matrix(const El::DistMatrix<El::BigFloat> &input);
   void ToBigFloatMatrix(El::Matrix<El::BigFloat> &output) const;
 };

@@ -24,7 +24,9 @@ def build(bld):
     # TODO use default_includes for all targets and simplify #include directives
     # e.g. #include "../../Timers.hxx" -> #include <Timers.hxx>
 
-    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx']
+    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx',
+                               'src/matrix_multiply/matrix_multiply.cxx',
+                               'src/matrix_multiply/Primes.cxx']
     bld.stlib(source=matrix_multiply_sources,
               target='matrix_multiply',
               cxxflags=default_flags,
@@ -345,7 +347,8 @@ def build(bld):
     bld.program(source=['external/catch2/catch_amalgamated.cpp',
                         'test/src/matrix_multiply_tests/main.cxx',
                         'test/src/matrix_multiply_tests/cases/test.cxx',
-                        ],
+                        'test/src/matrix_multiply_tests/cases/shared_window_test.cxx',
+                        'test/src/matrix_multiply_tests/cases/square_test.cxx'],
                 target='matrix_multiply_tests',
                 cxxflags=default_flags,
                 defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],

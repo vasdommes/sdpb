@@ -11,11 +11,10 @@
 template <class T> class Shared_Window_Array : boost::noncopyable
 {
 public:
+  MPI_Win win;
+  MPI_Comm comm;
   T *data;
   const size_t size;
-
-private:
-  MPI_Win win;
 
 public:
   Shared_Window_Array() = delete;
@@ -25,7 +24,8 @@ public:
   //
   // It ensures that all ranks in the communicator are on the same node
   // and can share memory.
-  Shared_Window_Array(MPI_Comm shared_memory_comm, size_t size) : size(size)
+  Shared_Window_Array(MPI_Comm shared_memory_comm, size_t size)
+      : comm(shared_memory_comm), size(size)
   {
     MPI_Aint local_window_size; // number of bytes allocated by current rank
     int disp_unit = sizeof(T);
@@ -42,15 +42,16 @@ public:
     MPI_Win_shared_query(win, 0, &local_window_size, &disp_unit, &data);
     assert(local_window_size == size * sizeof(T));
     assert(disp_unit == sizeof(T));
-    MPI_Win_fence(0, win);
+    Fence();
   }
 
   ~Shared_Window_Array()
   {
-    MPI_Win_fence(0, win);
+    Fence();
     MPI_Win_free(&win);
   }
 
+  void Fence() { MPI_Win_fence(0, win); }
   T &operator[](size_t index) { return data[index]; }
   const T &operator[](size_t index) const { return data[index]; }
 };
@@ -60,7 +61,7 @@ template <class T> class Shared_Memory_Matrix : boost::noncopyable
 {
 private:
   El::Matrix<T> matrix;
-  Shared_Window_Array<double> data;
+  Shared_Window_Array<T> data;
 
 public:
   Shared_Memory_Matrix() = delete;
@@ -84,130 +85,221 @@ public:
 // Shared memory window for storing block residues.
 // For each prime:
 // For each block:
-// Store matrix of residues (casted to double)
+// Store matrix of residues (casted to T=double)
 // All of them are stored consecutively,
-// in prime-block-col-major order
+// in prime-block-row-major order
 // NB we need single window for all primes, to use FLINT comb
-// TODO: we can avoid it, if we
-template <class T> class Block_Residue_Matrices_Window : boost::noncopyable
+// TODO change to col-major, it might be better for BLAS
+// we can use LDim (= sum of heights) to split into horizontal bands
+template <class T> class Block_Residue_Matrices_Window_Old : boost::noncopyable
 {
 private:
-  Shared_Window_Array<T> data;
-  std::vector<size_t> accumulated_heights;
+  Shared_Window_Array<T> window;
+  //  std::vector<size_t> block_offsets;
 
 public:
   const size_t num_primes;
   const size_t num_blocks;
   const std::vector<size_t> block_heights;
-  const size_t block_width;
-  // TODO
-  std::vector<std::vector<El::Matrix<T>>> blocks_residues;
+  const size_t height;
+  const size_t width;
 
-  Block_Residue_Matrices_Window() = delete;
-  Block_Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
-                                size_t num_blocks,
-                                const std::vector<size_t> &block_heights,
-                                size_t block_width)
-      : data(shared_memory_comm,
-             num_primes * TotalResidueHeight(block_heights) * block_width),
-        num_primes(num_primes),
+  // residues[prime_index] is a tall matrix containing residues of each block,
+  // stacked on top of each other:
+  // block_residues[prime_index][0]
+  // block_residues[prime_index][1]
+  // ...
+  // block_residues[prime_index][num_blocks-1]
+  //
+  // residues[prime_index] is a regular matrix attached to our memory window,
+  // and block_residues[prime_index][block_index] are its submatrices
+  // (referencing the same data)
+  std::vector<El::Matrix<T>> residues;
+  // block_residues[prime_index][block_index] = residue of block modulo prime
+  std::vector<std::vector<El::Matrix<T>>> block_residues;
+
+  Block_Residue_Matrices_Window_Old() = delete;
+  Block_Residue_Matrices_Window_Old(MPI_Comm shared_memory_comm,
+                                    size_t num_primes, size_t num_blocks,
+                                    const std::vector<size_t> &block_heights,
+                                    size_t block_width)
+      : num_primes(num_primes),
         num_blocks(num_blocks),
         block_heights(block_heights),
-        block_width(block_width)
+        height(Sum(block_heights)),
+        width(block_width),
+        window(shared_memory_comm, num_primes * height * width)
   {
-    accumulated_heights.resize(block_heights.size());
-    std::partial_sum(block_heights.begin(), block_heights.end(),
-                     accumulated_heights.begin());
+    //    block_offsets.resize(num_blocks);
+    //    size_t curr_offset = 0;
+    //    for(size_t i = 0; i < num_blocks; ++i)
+    //      {
+    //        block_offsets[i] = curr_offset;
+    //        curr_offset += block_heights.at(i) * block_width;
+    //      }
 
-    // TODO do we need it?
-    blocks_residues.resize(num_primes);
-    size_t block_offset = 0;
-    for(size_t prime = 0; prime < num_primes; ++prime)
+    residues.resize(num_primes);
+    block_residues.resize(num_primes);
+    for(size_t prime_index = 0; prime_index < num_primes; ++prime_index)
       {
-        blocks_residues.at(prime).resize(num_blocks);
-        for(size_t block = 0; block < num_blocks; ++block)
+        size_t prime_offset = prime_index * PrimeStride();
+        residues.at(prime_index)
+          .Attach(height, width, window.data + prime_offset);
+
+        block_residues.at(prime_index).resize(num_blocks);
+        size_t block_start_row = 0;
+        for(size_t block_index = 0; block_index < num_blocks; ++block_index)
           {
-            El::Matrix<T> &matrix = blocks_residues.at(prime).at(block);
-            auto height = block_heights.at(block);
-            auto width = block_width;
-            auto leading_dimension = height; // El::Matrix uses col-major order
-            matrix.Attach(height, width, data.data + block_offset,
-                          leading_dimension);
-            block_offset += height * width;
+            size_t block_height = block_heights.at(block_index);
+            El::Range<El::Int> I(block_start_row,
+                                 block_start_row + block_height);
+            El::Range<El::Int> J(0, width);
+            block_residues.at(prime_index).at(block_index)
+              = residues.at(prime_index)(I, J);
+
+            block_start_row += block_height;
           }
       }
   }
-  size_t GetIndex(size_t prime_index, size_t block_index, size_t i, size_t j)
-  {
-    auto prev_heights
-      = block_index == 0 ? 0 : accumulated_heights[block_index - 1];
-    auto total_height = accumulated_heights[num_blocks - 1];
-    return prime_index * total_height * block_width
-           + block_index * prev_heights * block_width + i + j * block_width;
-  }
-  double Get(size_t prime_index, size_t block_index, size_t i, size_t j)
-  {
-    return blocks_residues.at(prime_index).at(block_index).Get(i, j);
-    //        return data[GetIndex(prime_index, block_index, i, j)];
-  }
-  void
-  Set(size_t prime_index, size_t block_index, size_t i, size_t j, double value)
-  {
-    blocks_residues.at(prime_index).at(block_index).Set(i, j, value);
-    //    data[GetIndex(prime_index, block_index, i, j)] = value;
-  }
 
-  [[nodiscard]] size_t PrimeStride() const
-  {
-    return block_width * accumulated_heights[num_blocks - 1];
-  }
+  //  T *Data(size_t offset = 0)
+  //  {
+  //    assert(offset < window.size);
+  //    return window.data + offset;
+  //  }
+
+  //  size_t Offset(size_t prime_index, size_t block_index, size_t i, size_t j)
+  //  {
+  //    assert(prime_index < num_primes);
+  //    assert(block_index < num_blocks);
+  //    assert(i < block_heights.at(block_index));
+  //    assert(j < width);
+  //    size_t result = prime_index * PrimeStride() +
+  //    block_offsets.at(block_index)
+  //                    + i * width + j;
+  //    assert(result < window.size);
+  //    return result;
+  //  }
+
+  //  [[nodiscard]] T
+  //  Get(size_t prime_index, size_t block_index, size_t i, size_t j) const
+  //  {
+  //    //    return window[Offset(prime_index, block_index, i, j)];
+  //    return block_residues.at(prime_index).at(block_index).Get(i, j);
+  //  }
+  //
+  //  void Set(size_t prime_index, size_t block_index, size_t i, size_t j, T
+  //  value)
+  //  {
+  //    //    window[Offset(prime_index, block_index, i, j)] = value;
+  //    block_residues.at(prime_index).at(block_index).Set(i, j, value);
+  //  }
+
+  [[nodiscard]] size_t PrimeStride() const { return width * height; }
+  [[nodiscard]] size_t ColStride() const { return height; }
+
+  void Fence() { window.Fence(); }
 
 private:
-  static size_t TotalResidueHeight(const std::vector<size_t> &block_heights)
+  static size_t Sum(const std::vector<size_t> &block_heights)
   {
     return std::accumulate(block_heights.begin(), block_heights.end(), 0);
   }
 };
 
 // Vector of matrices stored in a contiguous Shared_Window_Array
+// in prime-row-major order
 // This is residues of Q (BLAS multiplication output is written to there)
+// NB: El::Matrix is col-major, so we can't reuse it here
 template <class T> class Residue_Matrices_Window : boost::noncopyable
 {
-private:
-  Shared_Window_Array<T> data;
-
 public:
-  std::vector<El::Matrix<T>> matrices;
-  const size_t prime_stride;
-  const size_t primes_size;
+  const size_t num_primes;
   const size_t height;
   const size_t width;
+  const size_t prime_stride;
+  std::vector<El::Matrix<T>> residues;
 
-  Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t primes_size,
+private:
+  Shared_Window_Array<T> window;
+
+public:
+  Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
                           size_t height, size_t width)
-      : data(shared_memory_comm, primes_size * height * width),
-        matrices(primes_size),
-        prime_stride(height * width),
-        primes_size(primes_size),
+      : num_primes(num_primes),
         height(height),
-        width(width)
+        width(width),
+        prime_stride(height * width),
+        window(shared_memory_comm, num_primes * prime_stride)
   {
-    assert(primes_size > 0);
+    assert(num_primes > 0);
     assert(height > 0);
     assert(width > 0);
-    for(size_t i = 0; i < primes_size; ++i)
+    residues.resize(num_primes);
+    for(size_t prime_index = 0; prime_index < num_primes; ++prime_index)
       {
-        size_t leading_dimension = height; // El::Matrix uses col-major order
-        matrices.at(i).Attach(height, width, data.data + i * prime_stride,
-                              leading_dimension);
+        size_t prime_offset = prime_index * prime_stride;
+        residues.at(prime_index)
+          .Attach(height, width, window.data + prime_offset, height);
       }
   }
-  double Get(size_t prime_index, size_t i, size_t j)
+  MPI_Comm Comm() { return window.comm; }
+  void Fence() { window.Fence(); }
+};
+
+// Same as Residue_Matrices_Window<T>,
+// but each (tall) residue matrix (i.e. residues[prime_index])
+// is split horizontally into blocks
+// (i.e. block_residues[prime_index][0..num_blocks-1])
+template <class T>
+class Block_Residue_Matrices_Window : public Residue_Matrices_Window<T>
+{
+public:
+  const size_t num_blocks;
+
+  // block_residues[prime_index][block_index] = residue of block modulo prime
+  // These matrices are views over residues[prime_index],
+  // which is a tall matrix containing residues of each block,
+  // stacked on top of each other:
+  // block_residues[prime_index][0]
+  // block_residues[prime_index][1]
+  // ...
+  // block_residues[prime_index][num_blocks-1]
+  //
+  // residues[prime_index] is a regular matrix attached to our memory window,
+  // and block_residues[prime_index][block_index] is a view to its submatrix
+  std::vector<std::vector<El::Matrix<T>>> block_residues;
+
+  Block_Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
+                                size_t num_blocks,
+                                const std::vector<size_t> &block_heights,
+                                size_t block_width)
+      : Residue_Matrices_Window<T>(shared_memory_comm, num_primes,
+                                   Sum(block_heights), block_width),
+        num_blocks(num_blocks),
+        block_residues(num_primes, std::vector<El::Matrix<T>>(num_blocks))
   {
-    return matrices[prime_index].Get(i, j);
+    for(size_t prime_index = 0; prime_index < num_primes; ++prime_index)
+      {
+        size_t block_start_row = 0;
+        for(size_t block_index = 0; block_index < num_blocks; ++block_index)
+          {
+            size_t block_height = block_heights.at(block_index);
+            El::Range<El::Int> I(block_start_row,
+                                 block_start_row + block_height);
+            El::Range<El::Int> J(0, this->width);
+            El::View(block_residues.at(prime_index).at(block_index),
+                     this->residues.at(prime_index), I, J);
+            block_start_row += block_height;
+          }
+      }
+    if(num_primes > 0 && num_blocks > 0)
+      assert(block_residues[0][0].Buffer() == this->residues[0].Buffer());
   }
-  void Set(size_t prime_index, size_t i, size_t j, double value)
+
+private:
+  static size_t Sum(const std::vector<size_t> &block_heights)
   {
-    matrices[prime_index].Set(i, j, value);
+    return std::accumulate(block_heights.begin(), block_heights.end(), 0);
   }
 };

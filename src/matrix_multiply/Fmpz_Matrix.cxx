@@ -1,18 +1,7 @@
 #include <flint/fmpz.h>
+#include "fmpz_util.hxx"
 #include "Fmpz_Matrix.hxx"
 // #include <boost/multiprecision/gmp.hpp>
-
-namespace
-{
-  void fmpz_t_to_BigFloat(const fmpz_t input, El::BigFloat &output)
-  {
-    fmpz_get_mpf(output.gmp_float.get_mpf_t(), input);
-  }
-  void BigFloat_to_fmpz_t(const El::BigFloat &input, fmpz_t output)
-  {
-    fmpz_set_mpf(output, input.gmp_float.get_mpf_t());
-  }
-}
 
 // Constructors
 
@@ -122,5 +111,16 @@ Fmpz_Matrix::Fmpz_Matrix(const El::Matrix<El::BigFloat> &input)
     for(int j = 0; j < width; ++j)
       {
         BigFloat_to_fmpz_t(input(i, j), (*this)(i, j));
+      }
+}
+Fmpz_Matrix::Fmpz_Matrix(const El::DistMatrix<El::BigFloat> &input)
+    : Fmpz_Matrix(input.Height(), input.Width())
+{
+  int height = Height();
+  int width = Width();
+  for(int i = 0; i < height; ++i)
+    for(int j = 0; j < width; ++j)
+      {
+        BigFloat_to_fmpz_t(input.Get(i, j), (*this)(i, j));
       }
 }
