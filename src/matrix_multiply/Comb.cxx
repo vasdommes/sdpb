@@ -1,7 +1,8 @@
 #include <flint/ulong_extras.h>
 #include <El.hpp>
+#include <flint/nmod.h>
 
-#include "Primes.hxx"
+#include "Comb.hxx"
 
 // TODO explain all parameters!
 namespace
@@ -25,6 +26,14 @@ namespace
     fmpz_t prod;
 
     p = 2 + 2 * n_sqrt((MAX_BLAS_DP_INT - 1) / (ulong)k);
+    // TODO the above results in overflow
+    //  e.g. when calculating square of tall matrix,
+    //  e.g with height=9585 and with 1.0 for precision=128
+    // Common sense suggests the following formula
+    // (and it works in our tests):
+    //      p = n_sqrt((MAX_BLAS_DP_INT - 1) / (ulong)k);
+    // But FLINT implementation works correctly,
+    // i.e. there is another obscure bug in our implementation.
     if(bits > 200)
       {
         /* if mod is the bottleneck, ensure p1*p2*p3 < 2^62 */
@@ -73,7 +82,7 @@ namespace
   std::vector<mp_limb_t> calculate_primes(flint_bitcnt_t bits, slong k)
   {
     slong n;
-    auto primes = _calculate_primes(&n, bits, k);
+    mp_limb_t *primes = _calculate_primes(&n, bits, k);
     // TODO test this case (happens with low precision) and add workaround
     if(primes == NULL)
       El::RuntimeError("Failed to calculate primes for bits=", bits, "k=", k);
@@ -84,23 +93,28 @@ namespace
   }
 }
 
-Primes::Primes(mp_limb_t bits, mp_limb_signed_t k)
-    : primes(calculate_primes(bits, k))
+Comb::Comb(mp_limb_t bits, mp_limb_signed_t k)
+    : primes(calculate_primes(bits, k)),
+      num_primes(primes.size()),
+      mods(num_primes),
+      shifts(num_primes)
 {
-  fmpz_comb_init(comb, primes.data(), primes.size());
+  fmpz_comb_init(comb, primes.data(), num_primes);
   fmpz_comb_temp_init(comb_temp, comb);
+  for(size_t i = 0; i < num_primes; ++i)
+    {
+      auto &mod = mods.at(i);
+      nmod_init(&mod, primes.at(i));
+      shifts.at(i) = ((2 * MAX_BLAS_DP_INT) / mod.n) * mod.n;
+    }
 }
 
-Primes::Primes(mp_limb_t Abits, mp_limb_t Bbits, int sign, mp_limb_signed_t k)
-    : Primes(calculate_output_bits(Abits, Bbits, sign, k), k)
+Comb::Comb(mp_limb_t Abits, mp_limb_t Bbits, int sign, mp_limb_signed_t k)
+    : Comb(calculate_output_bits(Abits, Bbits, sign, k), k)
 {}
 
-Primes::~Primes()
+Comb::~Comb()
 {
   fmpz_comb_temp_clear(comb_temp);
   fmpz_comb_clear(comb);
-}
-size_t Primes::size() const
-{
-  return primes.size();
 }

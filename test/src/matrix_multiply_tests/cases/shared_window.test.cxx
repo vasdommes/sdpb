@@ -1,7 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Normalized_Matrix.hxx"
-#include "test_util/diff.hxx"
+#include "test_util/test_util.hxx"
 #include "matrix_multiply/Shared_Window_Array.hxx"
 
 #include <vector>

@@ -107,4 +107,20 @@ namespace Test_Util::REQUIRE_Equal
           DIFF(a.Get(row, col), b.Get(row, col));
         }
   }
+  template <class T>
+  inline void diff(const El::DistMatrix<T> &a, const El::DistMatrix<T> &b)
+  {
+    INFO("diff El::DistMatrix");
+    REQUIRE(a.Height() == b.Height());
+    REQUIRE(a.Width() == b.Width());
+    REQUIRE(a.Grid() == b.Grid());
+
+    for(int row = 0; row < a.LocalHeight(); ++row)
+      for(int col = 0; col < a.LocalWidth(); ++col)
+        {
+          CAPTURE(row);
+          CAPTURE(col);
+          DIFF(a.GetLocal(row, col), b.GetLocal(row, col));
+        }
+  }
 }

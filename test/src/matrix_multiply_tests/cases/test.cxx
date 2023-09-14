@@ -1,21 +1,11 @@
 #include <catch2/catch_amalgamated.hpp>
 
 #include "matrix_multiply/Fmpz_Matrix.hxx"
-#include "matrix_multiply/Normalized_Matrix.hxx"
-#include "matrix_multiply/Primes.hxx"
-#include "set_stream_precision.hxx"
-#include "test_util/diff.hxx"
+#include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
-#include "matrix_multiply/Shared_Window_Array.hxx"
-#include "matrix_multiply/matrix_multiply.hxx"
-#include "sdp_solve/Block_Info.hxx"
 
-#include <iostream>
 #include <vector>
-#include <gmp.h>
-#include <gmpxx.h>
 #include <cblas.h>
-#include <chrono>
 #include <flint/flint.h>
 #include <flint/fmpz.h>
 #include <flint/fmpz_mat.h>
@@ -23,7 +13,6 @@
 #include <flint/nmod.h>
 
 #include <El.hpp>
-#include <boost/multiprecision/mpfr.hpp>
 
 using Test_Util::REQUIRE_Equal::diff;
 

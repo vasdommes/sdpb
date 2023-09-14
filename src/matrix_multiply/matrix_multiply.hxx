@@ -10,4 +10,4 @@ void calculate_Block_Matrix_square(
   // Indices of input_normalized_blocks in blocks_window
   const std::vector<size_t> &block_indices_for_window,
   Block_Residue_Matrices_Window<double> &blocks_window,
-  Residue_Matrices_Window<double> &result_window, Primes &primes);
+  Residue_Matrices_Window<double> &result_window, Comb &comb);
