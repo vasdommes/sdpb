@@ -36,6 +36,7 @@ NamespaceIndentation: All
 PenaltyExcessCharacter: 100
 PenaltyReturnTypeOnItsOwnLine: 1
 PointerAlignment: Right
+ReflowComments: false
 SortIncludes: false
 SpaceBeforeParens: Never
 SpacesInContainerLiterals: false
