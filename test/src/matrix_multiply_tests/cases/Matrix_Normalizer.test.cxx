@@ -1,6 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Comb.hxx"
+#include "matrix_multiply/Fmpz_Comb.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
 #include "matrix_multiply/Matrix_Normalizer.hxx"
@@ -87,6 +87,12 @@ TEST_CASE("normalize_and_shift")
 
     SECTION("restore_Q")
     {
+      INFO(
+        "Check that calculating Q with and without intermediate normalization "
+        "gives the same result up to a reasonable diff_precision");
+      int diff_precision;
+      CAPTURE(diff_precision = bits / 2);
+
       El::DistMatrix<El::BigFloat> initial_Q, Q;
       El::Syrk(El::UpperOrLowerNS::UPPER, El::OrientationNS::TRANSPOSE,
                El::BigFloat(1), initial_P_matrix, initial_Q);
@@ -99,17 +105,13 @@ TEST_CASE("normalize_and_shift")
           for(int j = 0; j < P_matrix.LocalWidth(); ++j)
             {
               if(Q.GlobalRow(i) == Q.GlobalCol(j))
-                DIFF(Q.GetLocal(i, j) >> 2 * bits, El::BigFloat(1.0));
+                DIFF_PREC(Q.GetLocal(i, j) >> 2 * bits, El::BigFloat(1.0),
+                          diff_precision);
             }
       }
 
       normalizer.restore_Q(Q);
 
-      INFO(
-        "Check that calculating Q with and without intermediate normalization "
-        "gives the same result up to a reasonable diff_precision");
-      int diff_precision;
-      CAPTURE(diff_precision = bits - FLINT_BIT_COUNT(P_matrix.Height()) - 1);
       DIFF_PREC(initial_Q, Q, diff_precision);
     }
   }

@@ -7,7 +7,7 @@
 // adopted from FLINT, fmpz_mat/mul_blas.c
 // TODO: rename arguments and add description to make the code readable
 // TODO think which constructor we really want to use
-struct Comb : boost::noncopyable
+struct Fmpz_Comb : boost::noncopyable
 {
   fmpz_comb_t comb{};
   fmpz_comb_temp_t comb_temp{};
@@ -16,7 +16,7 @@ struct Comb : boost::noncopyable
   std::vector<nmod_t> mods;
   std::vector<ulong> shifts;
 
-  Comb() = delete;
+  Fmpz_Comb() = delete;
   // TODO fix description, can be wrong
   // bits: Number of bits to store matrix multiplication result
   // k: number of additions.
@@ -27,7 +27,7 @@ struct Comb : boost::noncopyable
   //   sign = 0 if A and B are non-negative, 1 otherwise
   //   k = A.Width() = B.Height()
   //   bits = Abits + Bbits + bits(k) + sign
-  Comb(flint_bitcnt_t bits, slong k);
-  Comb(flint_bitcnt_t Abits, flint_bitcnt_t Bbits, int sign, slong k);
-  ~Comb();
+  Fmpz_Comb(flint_bitcnt_t bits, slong k);
+  Fmpz_Comb(flint_bitcnt_t Abits, flint_bitcnt_t Bbits, int sign, slong k);
+  ~Fmpz_Comb();
 };

@@ -29,11 +29,19 @@ namespace Test_Util
 // Catch::StringMaker is used to print variables in CAPTURE() macro.
 namespace Catch
 {
+  template <> struct StringMaker<El::Matrix<double>>
+  {
+    static std::string convert(const El::Matrix<double> &matrix)
+    {
+      return Test_Util::to_string(matrix, "Matrix<double>");
+    }
+  };
+
   template <> struct StringMaker<El::Matrix<El::BigFloat>>
   {
     static std::string convert(const El::Matrix<El::BigFloat> &matrix)
     {
-      return Test_Util::to_string(matrix, "Matrix");
+      return Test_Util::to_string(matrix, "Matrix<BigFloat>");
     }
   };
 
@@ -41,7 +49,7 @@ namespace Catch
   {
     static std::string convert(const El::DistMatrix<El::BigFloat> &matrix)
     {
-      return Test_Util::to_string(matrix, "DistMatrix");
+      return Test_Util::to_string(matrix, "DistMatrix<BigFloat>");
     }
   };
 }

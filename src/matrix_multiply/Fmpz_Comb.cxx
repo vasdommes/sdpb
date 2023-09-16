@@ -2,7 +2,7 @@
 #include <El.hpp>
 #include <flint/nmod.h>
 
-#include "Comb.hxx"
+#include "Fmpz_Comb.hxx"
 
 // TODO explain all parameters!
 namespace
@@ -31,7 +31,7 @@ namespace
     //  e.g with height=9585 and with 1.0 for precision=128
     // Common sense suggests the following formula
     // (and it works in our tests):
-    //      p = n_sqrt((MAX_BLAS_DP_INT - 1) / (ulong)k);
+    //          p = n_sqrt((MAX_BLAS_DP_INT - 1) / (ulong)k);
     // But FLINT implementation works correctly,
     // i.e. there is another obscure bug in our implementation.
     if(bits > 200)
@@ -93,7 +93,7 @@ namespace
   }
 }
 
-Comb::Comb(mp_limb_t bits, mp_limb_signed_t k)
+Fmpz_Comb::Fmpz_Comb(mp_limb_t bits, mp_limb_signed_t k)
     : primes(calculate_primes(bits, k)),
       num_primes(primes.size()),
       mods(num_primes),
@@ -109,11 +109,12 @@ Comb::Comb(mp_limb_t bits, mp_limb_signed_t k)
     }
 }
 
-Comb::Comb(mp_limb_t Abits, mp_limb_t Bbits, int sign, mp_limb_signed_t k)
-    : Comb(calculate_output_bits(Abits, Bbits, sign, k), k)
+Fmpz_Comb::Fmpz_Comb(mp_limb_t Abits, mp_limb_t Bbits, int sign,
+                     mp_limb_signed_t k)
+    : Fmpz_Comb(calculate_output_bits(Abits, Bbits, sign, k), k)
 {}
 
-Comb::~Comb()
+Fmpz_Comb::~Fmpz_Comb()
 {
   fmpz_comb_temp_clear(comb_temp);
   fmpz_comb_clear(comb);

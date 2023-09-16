@@ -1,6 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Comb.hxx"
+#include "matrix_multiply/Fmpz_Comb.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
 #include "matrix_multiply/Shared_Window_Array.hxx"
@@ -20,10 +20,7 @@ namespace
     El::Matrix<El::BigFloat> Q_result_El_Syrk;
     El::Syrk(El::UpperOrLowerNS::UPPER, El::OrientationNS::TRANSPOSE,
              El::BigFloat(1.0), P_matrix, Q_result_El_Syrk);
-    // Initialize lower half:
-    for(int i = 0; i < Q_result_El_Syrk.Height(); ++i)
-      for(int j = 0; j < i; ++j)
-        Q_result_El_Syrk(i, j) = Q_result_El_Syrk(j, i);
+    El::MakeSymmetric(El::UpperOrLowerNS::UPPER, Q_result_El_Syrk);
     return Q_result_El_Syrk;
   }
 
@@ -87,7 +84,8 @@ TEST_CASE("calculate_Block_Matrix_square")
   // TODO fails with for loop in Release mode!
   // but works without for loop, or in Debug node
   for(size_t block_width : {1, 10})
-    for(size_t num_blocks : {1, 10, 100, 500})
+    for(size_t num_blocks : {1, 10, 100, 500, 1000})
+      //    for(size_t num_blocks : {100})
       DYNAMIC_SECTION("num_blocks=" << num_blocks
                                     << " block_width=" << block_width)
       //  size_t num_blocks=10; size_t block_width=5;
@@ -109,8 +107,7 @@ TEST_CASE("calculate_Block_Matrix_square")
         int bits;
         CAPTURE(bits = El::gmp::Precision());
         int diff_precision;
-        CAPTURE(diff_precision
-                = bits - FLINT_BIT_COUNT(total_block_height) - 1);
+        CAPTURE(diff_precision = bits / 2);
 
         // P_matrix is a tall matrix of all blocks.
         // We initialize it on rank=0 and then copy to all ranks.
@@ -191,7 +188,7 @@ TEST_CASE("calculate_Block_Matrix_square")
         // calculate via BLAS
 
         int sign = 1;
-        Comb comb(bits, bits, sign, total_block_height);
+        Fmpz_Comb comb(bits, bits, sign, total_block_height);
         CAPTURE(comb.num_primes);
         CAPTURE(comb.primes);
         CAPTURE(FLINT_BIT_COUNT(total_block_height));
@@ -223,9 +220,9 @@ TEST_CASE("calculate_Block_Matrix_square")
         Residue_Matrices_Window<double> result_residues_window(
           comm, comb.num_primes, block_width, block_width);
 
-        calculate_Block_Matrix_square(Q_result, blocks, block_indices,
+        calculate_Block_Matrix_square(comm, blocks, block_indices,
                                       block_residues_window,
-                                      result_residues_window, comb);
+                                      result_residues_window, comb, Q_result);
 
         CAPTURE(num_blocks);
         CAPTURE(block_width);
@@ -242,19 +239,24 @@ TEST_CASE("calculate_Block_Matrix_square")
             //                + primes.size());
             //
             std::vector<double> result_00_residues;
-            double max_residue = 0;
+            double max_Q_residue = 0;
             for(const auto &matrix : result_residues_window.residues)
               {
                 double residue = matrix.Get(0, 0);
                 result_00_residues.emplace_back(residue);
-                max_residue = std::max(residue, max_residue);
+                max_Q_residue = std::max(residue, max_Q_residue);
               }
 
             CAPTURE(result_00_residues);
 
             CAPTURE(comb.primes.at(0));
-            CAPTURE((comb.primes.at(0) - 1) * (comb.primes.at(0) - 1)*total_block_height);
-            CAPTURE(max_residue);
+            auto max_uint32_P_residue = comb.primes.at(0) / 2;
+            CAPTURE(max_uint32_P_residue * max_uint32_P_residue
+                    * total_block_height);
+            CAPTURE(max_Q_residue);
+            REQUIRE((double)max_uint32_P_residue * max_uint32_P_residue
+                      * total_block_height
+                    >= max_Q_residue);
             CAPTURE(std::numeric_limits<uint32_t>::max());
             CAPTURE(std::numeric_limits<slong>::max());
 
