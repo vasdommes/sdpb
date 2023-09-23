@@ -66,3 +66,21 @@ void initialize_Q_group(const SDP &sdp, const Block_Info &block_info,
       syrk_timer.stop();
     }
 }
+
+void synchronize_Q(El::DistMatrix<El::BigFloat> &Q,
+                   const El::DistMatrix<El::BigFloat> &Q_group,
+                   Timers &timers);
+
+void compute_Q(const SDP &sdp, const Block_Info &block_info,
+               const Block_Diagonal_Matrix &schur_complement,
+               Block_Matrix &schur_off_diagonal,
+               Block_Diagonal_Matrix &schur_complement_cholesky,
+               El::DistMatrix<El::BigFloat> &Q, const El::Grid &group_grid,
+               Timers &timers)
+{
+  Scoped_Timer timer(timers, "run.step.initializeSchurComplementSolver.Q");
+  El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), group_grid);
+  initialize_Q_group(sdp, block_info, schur_complement, schur_off_diagonal,
+                     schur_complement_cholesky, Q_group, timers);
+  synchronize_Q(Q, Q_group, timers);
+}

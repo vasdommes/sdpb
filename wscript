@@ -76,7 +76,7 @@ def build(bld):
                        'src/sdp_solve/SDP_Solver/run/step/step.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/initialize_schur_complement_solver.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/compute_schur_complement.cxx',
-                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/initialize_Q_group.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/compute_Q.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/synchronize_Q.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/compute_search_direction/compute_search_direction.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/compute_search_direction/cholesky_solve.cxx',

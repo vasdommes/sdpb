@@ -48,11 +48,12 @@ void compute_schur_complement(
     &A_Y,
   Block_Diagonal_Matrix &schur_complement, Timers &timers);
 
-void initialize_Q_group(const SDP &sdp, const Block_Info &block_info,
-                        const Block_Diagonal_Matrix &schur_complement,
-                        Block_Matrix &schur_off_diagonal,
-                        Block_Diagonal_Matrix &schur_complement_cholesky,
-                        El::DistMatrix<El::BigFloat> &Q_group, Timers &timers);
+void compute_Q(const SDP &sdp, const Block_Info &block_info,
+               const Block_Diagonal_Matrix &schur_complement,
+               Block_Matrix &schur_off_diagonal,
+               Block_Diagonal_Matrix &schur_complement_cholesky,
+               El::DistMatrix<El::BigFloat> &Q, const El::Grid &group_grid,
+               Timers &timers);
 
 void synchronize_Q(El::DistMatrix<El::BigFloat> &Q,
                    const El::DistMatrix<El::BigFloat> &Q_group,
@@ -82,18 +83,8 @@ void initialize_schur_complement_solver(
 
   compute_schur_complement(block_info, A_X_inv, A_Y, schur_complement, timers);
 
-  auto &Q_computation_timer(
-    timers.add_and_start("run.step.initializeSchurComplementSolver.Q"));
-
-  {
-    // FIXME: Change initialize_Q_group to initialize_Q and
-    // synchronize inside.
-    El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), group_grid);
-    initialize_Q_group(sdp, block_info, schur_complement, schur_off_diagonal,
-                       schur_complement_cholesky, Q_group, timers);
-    synchronize_Q(Q, Q_group, timers);
-  }
-  Q_computation_timer.stop();
+  compute_Q(sdp, block_info, schur_complement, schur_off_diagonal,
+            schur_complement_cholesky, Q, group_grid, timers);
 
   auto &Cholesky_timer(
     timers.add_and_start("run.step.initializeSchurComplementSolver."
