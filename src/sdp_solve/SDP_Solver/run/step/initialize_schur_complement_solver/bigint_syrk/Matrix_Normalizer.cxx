@@ -74,6 +74,9 @@ namespace
   void add_local_column_norms_squared(
     std::vector<El::BigFloat> &local_norms_squared, const TMatrix &matrix)
   {
+    if(local_norms_squared.size() != matrix.Width())
+      El::Output("local_norms_squared.size() != matrix.Width(): ",
+                 local_norms_squared.size(), " ", matrix.Width());
     assert(local_norms_squared.size() == matrix.Width());
     for(int iLoc = 0; iLoc < local_height(matrix); ++iLoc)
       for(int jLoc = 0; jLoc < local_width(matrix); ++jLoc)
@@ -192,9 +195,55 @@ Matrix_Normalizer::normalize_and_shift_P(El::Matrix<El::BigFloat> &);
 template void
 Matrix_Normalizer::normalize_and_shift_P(El::DistMatrix<El::BigFloat> &);
 
+template <class TMatrices>
+void Matrix_Normalizer::normalize_and_shift_P_blocks(TMatrices &P_matrix_blocks)
+{
+  for(auto &block : P_matrix_blocks)
+    normalize_and_shift_P(block);
+}
+template void Matrix_Normalizer::normalize_and_shift_P_blocks(
+  std::vector<El::Matrix<El::BigFloat>> &P_matrix_blocks);
+template void Matrix_Normalizer::normalize_and_shift_P_blocks(
+  std::vector<El::DistMatrix<El::BigFloat>> &P_matrix_blocks);
+
+// restore P
+
+template <class TMatrix> void Matrix_Normalizer::restore_P(TMatrix &P_block)
+{
+  assert(P_block.Width() == column_norms.size());
+  El::BigFloat value;
+  for(int jLoc = 0; jLoc < local_width(P_block); ++jLoc)
+    {
+      int j = global_col(P_block, jLoc);
+      const auto &norm = column_norms.at(j);
+      if(norm == El::BigFloat(0))
+        continue;
+      for(int iLoc = 0; iLoc < local_height(P_block); ++iLoc)
+        {
+          value = get_local_cref(P_block, iLoc, jLoc) >> precision;
+          set_local(P_block, iLoc, jLoc, value * norm);
+        }
+    }
+}
+template void
+Matrix_Normalizer::restore_P(El::DistMatrix<El::BigFloat> &P_block);
+template void Matrix_Normalizer::restore_P(El::Matrix<El::BigFloat> &P_block);
+
+template <class TMatrices>
+void Matrix_Normalizer::restore_P_blocks(TMatrices &P_matrix_blocks)
+{
+  for(auto &block : P_matrix_blocks)
+    restore_P(block);
+}
+template void Matrix_Normalizer::restore_P_blocks(
+  std::vector<El::Matrix<El::BigFloat>> &P_matrix_blocks);
+template void Matrix_Normalizer::restore_P_blocks(
+  std::vector<El::DistMatrix<El::BigFloat>> &P_matrix_blocks);
+
 // restore_Q
 
-template <class TMatrix> void Matrix_Normalizer::restore_Q(TMatrix &Q_matrix)
+template <class TMatrix>
+void Matrix_Normalizer::restore_Q(El::UpperOrLower uplo, TMatrix &Q_matrix)
 {
   assert(Q_matrix.Height() == column_norms.size());
   assert(Q_matrix.Width() == column_norms.size());
@@ -204,6 +253,10 @@ template <class TMatrix> void Matrix_Normalizer::restore_Q(TMatrix &Q_matrix)
       {
         int i = global_row(Q_matrix, iLoc);
         int j = global_col(Q_matrix, jLoc);
+        if(uplo == El::UPPER && i > j)
+          continue;
+        if(uplo == El::LOWER && i < j)
+          continue;
 
         const auto &normshifted_value = get_local_cref(Q_matrix, iLoc, jLoc);
         restored_value = (normshifted_value >> 2 * precision)
@@ -211,5 +264,7 @@ template <class TMatrix> void Matrix_Normalizer::restore_Q(TMatrix &Q_matrix)
         set_local(Q_matrix, iLoc, jLoc, restored_value);
       }
 }
-template void Matrix_Normalizer::restore_Q(El::Matrix<El::BigFloat> &);
-template void Matrix_Normalizer::restore_Q(El::DistMatrix<El::BigFloat> &);
+template void Matrix_Normalizer::restore_Q(El::UpperOrLower uplo,
+                                           El::Matrix<El::BigFloat> &);
+template void Matrix_Normalizer::restore_Q(El::UpperOrLower uplo,
+                                           El::DistMatrix<El::BigFloat> &);

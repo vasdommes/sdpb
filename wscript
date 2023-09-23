@@ -24,15 +24,15 @@ def build(bld):
     # TODO use default_includes for all targets and simplify #include directives
     # e.g. #include "../../Timers.hxx" -> #include <Timers.hxx>
 
-    matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx',
-                               'src/matrix_multiply/matrix_multiply.cxx',
-                               'src/matrix_multiply/Comb.cxx',
-                               'src/matrix_multiply/Matrix_Normalizer.cxx']
-    bld.stlib(source=matrix_multiply_sources,
-              target='matrix_multiply',
-              cxxflags=default_flags,
-              default_includes=default_includes + ['flint'],
-              use=use_packages + ['flint'])
+    # matrix_multiply_sources = ['src/matrix_multiply/Fmpz_Matrix.cxx',
+    #                            'src/matrix_multiply/matrix_multiply.cxx',
+    #                            'src/matrix_multiply/Comb.cxx',
+    #                            'src/matrix_multiply/Matrix_Normalizer.cxx']
+    # bld.stlib(source=matrix_multiply_sources,
+    #           target='matrix_multiply',
+    #           cxxflags=default_flags,
+    #           default_includes=default_includes + ['flint'],
+    #           use=use_packages + ['flint'])
 
     sdp_solve_sources=['src/sdp_solve/Solver_Parameters/Solver_Parameters.cxx',
                        'src/sdp_solve/Solver_Parameters/ostream.cxx',
@@ -78,6 +78,11 @@ def build(bld):
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/compute_schur_complement.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/compute_Q.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/synchronize_Q.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/BigInt_Shared_Memory_Syrk_Context.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/matrix_multiply.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Matrix_Normalizer.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Matrix.cxx',
+                       'src/sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Comb.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/compute_search_direction/compute_search_direction.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/compute_search_direction/cholesky_solve.cxx',
                        'src/sdp_solve/SDP_Solver/run/step/compute_search_direction/compute_schur_RHS.cxx',
@@ -99,7 +104,7 @@ def build(bld):
               target='sdp_solve',
               cxxflags=default_flags,
               defines=default_defines,
-              use=use_packages + ['sdp_convert'])
+              use=use_packages + ['sdp_convert', 'flint'])
     
     # SDPB executable
     bld.program(source=['src/sdpb/main.cxx',
@@ -354,6 +359,6 @@ def build(bld):
                 target='matrix_multiply_tests',
                 cxxflags=default_flags,
                 defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],
-                use=use_packages + ['flint', 'matrix_multiply'],
+                use=use_packages + ['sdp_solve'],
                 includes=default_includes + ['test/src']
                 )

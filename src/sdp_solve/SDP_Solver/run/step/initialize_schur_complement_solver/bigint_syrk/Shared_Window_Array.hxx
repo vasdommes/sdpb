@@ -12,7 +12,7 @@ template <class T> class Shared_Window_Array : boost::noncopyable
 {
 public:
   MPI_Win win;
-  MPI_Comm comm;
+  El::mpi::Comm comm;
   T *data;
   const size_t size;
 
@@ -24,7 +24,7 @@ public:
   //
   // It ensures that all ranks in the communicator are on the same node
   // and can share memory.
-  Shared_Window_Array(MPI_Comm shared_memory_comm, size_t size)
+  Shared_Window_Array(El::mpi::Comm shared_memory_comm, size_t size)
       : comm(shared_memory_comm), size(size)
   {
     MPI_Aint local_window_size; // number of bytes allocated by current rank
@@ -37,7 +37,7 @@ public:
       local_window_size = 0;
 
     MPI_Win_allocate_shared(local_window_size, disp_unit, MPI_INFO_NULL,
-                            shared_memory_comm, &data, &win);
+                            shared_memory_comm.comm, &data, &win);
     // Get local pointer to data allocated in rank=0
     MPI_Win_shared_query(win, 0, &local_window_size, &disp_unit, &data);
     assert(local_window_size == size * sizeof(T));
@@ -224,7 +224,7 @@ private:
   Shared_Window_Array<T> window;
 
 public:
-  Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
+  Residue_Matrices_Window(El::mpi::Comm shared_memory_comm, size_t num_primes,
                           size_t height, size_t width)
       : num_primes(num_primes),
         height(height),
@@ -243,7 +243,7 @@ public:
           .Attach(height, width, window.data + prime_offset, height);
       }
   }
-  MPI_Comm Comm() { return window.comm; }
+  El::mpi::Comm Comm() const { return window.comm; }
   void Fence() { window.Fence(); }
 };
 
@@ -270,9 +270,9 @@ public:
   // and block_residues[prime_index][block_index] is a view to its submatrix
   std::vector<std::vector<El::Matrix<T>>> block_residues;
 
-  Block_Residue_Matrices_Window(MPI_Comm shared_memory_comm, size_t num_primes,
-                                size_t num_blocks,
-                                const std::vector<size_t> &block_heights,
+  Block_Residue_Matrices_Window(El::mpi::Comm shared_memory_comm,
+                                size_t num_primes, size_t num_blocks,
+                                const std::vector<El::Int> &block_heights,
                                 size_t block_width)
       : Residue_Matrices_Window<T>(shared_memory_comm, num_primes,
                                    Sum(block_heights), block_width),
@@ -298,7 +298,7 @@ public:
   }
 
 private:
-  static size_t Sum(const std::vector<size_t> &block_heights)
+  static El::Int Sum(const std::vector<El::Int> &block_heights)
   {
     return std::accumulate(block_heights.begin(), block_heights.end(), 0);
   }

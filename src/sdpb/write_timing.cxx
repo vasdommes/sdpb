@@ -16,12 +16,14 @@ void write_timing(const fs::path &checkpoint_out, const Block_Info &block_info, 
   El::Zero(block_timings);
   for(auto &index : block_info.block_indices)
     {
-      block_timings(index, 0) = timers.elapsed_milliseconds(
-                                  "run.step.initializeSchurComplementSolver."
-                                  "Q.syrk_"
-                                  + std::to_string(index))
-                                + timers.elapsed_milliseconds(
-                                    "run.step.initializeSchurComplementSolver."
+      block_timings(index, 0) =
+        // TODO
+        //        timers.elapsed_milliseconds(
+        //                                  "run.step.initializeSchurComplementSolver."
+        //                                  "Q.syrk_"
+        //                                  + std::to_string(index))
+        //                                +
+        timers.elapsed_milliseconds("run.step.initializeSchurComplementSolver."
                                     "Q.solve_"
                                     + std::to_string(index))
                                 + timers.elapsed_milliseconds(

@@ -1,6 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Fmpz_Matrix.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Matrix.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
 

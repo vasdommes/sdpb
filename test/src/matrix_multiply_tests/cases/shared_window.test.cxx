@@ -1,7 +1,7 @@
 #include <catch2/catch_amalgamated.hpp>
 
 #include "test_util/test_util.hxx"
-#include "matrix_multiply/Shared_Window_Array.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Shared_Window_Array.hxx"
 
 #include <vector>
 #include <El.hpp>
@@ -10,9 +10,9 @@ using Test_Util::REQUIRE_Equal::diff;
 
 TEST_CASE("MPI_Shared_Window")
 {
-  MPI_Comm comm;
+  El::mpi::Comm comm;
   MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
-                      &comm);
+                      &comm.comm);
 
   SECTION("Shared_Window_Array")
   {
@@ -79,7 +79,7 @@ TEST_CASE("MPI_Shared_Window")
     //    width = 100;
 
     std::vector<std::vector<El::Matrix<double>>> block_residues(num_primes);
-    std::vector<size_t> block_heights(num_blocks);
+    std::vector<El::Int> block_heights(num_blocks);
     for(size_t b = 0; b < num_blocks; ++b)
       {
         block_heights.at(b) = width + b; // to make heights different

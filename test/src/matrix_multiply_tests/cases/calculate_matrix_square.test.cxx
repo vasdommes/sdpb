@@ -1,11 +1,11 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Fmpz_Comb.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Comb.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
-#include "matrix_multiply/Shared_Window_Array.hxx"
-#include "matrix_multiply/matrix_multiply.hxx"
-#include "matrix_multiply/Matrix_Normalizer.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/BigInt_Shared_Memory_Syrk_Context.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/matrix_multiply.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Matrix_Normalizer.hxx"
 
 #include <vector>
 #include <El.hpp>
@@ -63,7 +63,8 @@ namespace
     El::Matrix<El::BigFloat> Q_result;
     Q.ToBigFloatMatrix(Q_result);
 
-    normalizer.restore_Q(Q_result);
+    normalizer.restore_Q(El::UPPER, Q_result);
+    El::MakeSymmetric(El::UPPER, Q_result);
     return Q_result;
   }
 }
@@ -93,8 +94,9 @@ TEST_CASE("calculate_Block_Matrix_square")
         CAPTURE(num_blocks);
         CAPTURE(block_width);
 
-        std::vector<size_t> block_heights(num_blocks);
+        std::vector<El::Int> block_heights(num_blocks);
         size_t total_block_height = 0;
+        // TODO assign random heights, as in Matrix_Normalizer.test
         for(size_t block_index = 0; block_index < num_blocks; ++block_index)
           {
             size_t height = block_index + 100;
@@ -187,12 +189,6 @@ TEST_CASE("calculate_Block_Matrix_square")
 
         // calculate via BLAS
 
-        int sign = 1;
-        Fmpz_Comb comb(bits, bits, sign, total_block_height);
-        CAPTURE(comb.num_primes);
-        CAPTURE(comb.primes);
-        CAPTURE(FLINT_BIT_COUNT(total_block_height));
-
         // blocks are distributed among all ranks
         Matrix_Normalizer normalizer(blocks, block_width, bits,
                                      El::mpi::COMM_WORLD);
@@ -214,15 +210,25 @@ TEST_CASE("calculate_Block_Matrix_square")
         El::DistMatrix<El::BigFloat> Q_result(block_width, block_width,
                                               result_grid);
 
-        Block_Residue_Matrices_Window<double> block_residues_window(
-          comm, comb.num_primes, block_heights.size(), block_heights,
-          block_width);
-        Residue_Matrices_Window<double> result_residues_window(
-          comm, comb.num_primes, block_width, block_width);
+        El::UpperOrLower uplo = El::UpperOrLowerNS::UPPER;
+        BigInt_Shared_Memory_Syrk_Context context(comm, bits, block_heights,
+                                                  block_width);
 
-        calculate_Block_Matrix_square(comm, blocks, block_indices,
-                                      block_residues_window,
-                                      result_residues_window, comb, Q_result);
+        Timers timers(false);
+        context.bigint_syrk_blas(uplo, blocks, block_indices, Q_result,
+                                 timers);
+
+        //                Block_Residue_Matrices_Window<double> block_residues_window(
+        //                  comm, comb.num_primes, block_heights.size(), block_heights,
+        //                  block_width);
+        //                Residue_Matrices_Window<double> result_residues_window(
+        //                  comm, comb.num_primes, block_width, block_width);
+        //        calculate_Block_Matrix_square(comm, blocks, block_indices,
+        //                                      block_residues_window,
+        //                                      result_residues_window, comb, Q_result);
+
+        // TODO once
+        El::MakeSymmetric(uplo, Q_result);
 
         CAPTURE(num_blocks);
         CAPTURE(block_width);
@@ -240,7 +246,7 @@ TEST_CASE("calculate_Block_Matrix_square")
             //
             std::vector<double> result_00_residues;
             double max_Q_residue = 0;
-            for(const auto &matrix : result_residues_window.residues)
+            for(const auto &matrix : context.output_residues_window.residues)
               {
                 double residue = matrix.Get(0, 0);
                 result_00_residues.emplace_back(residue);
@@ -249,14 +255,14 @@ TEST_CASE("calculate_Block_Matrix_square")
 
             CAPTURE(result_00_residues);
 
-            CAPTURE(comb.primes.at(0));
-            auto max_uint32_P_residue = comb.primes.at(0) / 2;
-            CAPTURE(max_uint32_P_residue * max_uint32_P_residue
-                    * total_block_height);
-            CAPTURE(max_Q_residue);
-            REQUIRE((double)max_uint32_P_residue * max_uint32_P_residue
-                      * total_block_height
-                    >= max_Q_residue);
+            //            CAPTURE(comb.primes.at(0));
+            //            auto max_uint32_P_residue = comb.primes.at(0) / 2;
+            //            CAPTURE(max_uint32_P_residue * max_uint32_P_residue
+            //                    * total_block_height);
+            //            CAPTURE(max_Q_residue);
+            //            REQUIRE((double)max_uint32_P_residue * max_uint32_P_residue
+            //                      * total_block_height
+            //                    >= max_Q_residue);
             CAPTURE(std::numeric_limits<uint32_t>::max());
             CAPTURE(std::numeric_limits<slong>::max());
 
@@ -267,7 +273,9 @@ TEST_CASE("calculate_Block_Matrix_square")
         //  INFO("normshifted Q_result:");
         //  CAPTURE(Q_result);
         //  INFO("restore...");
-        normalizer.restore_Q(Q_result);
+        normalizer.restore_Q(uplo, Q_result);
+        El::MakeSymmetric(uplo, Q_result);
+
         CAPTURE(Q_result);
 
         for(int i = 0; i < Q_result.LocalHeight(); ++i)

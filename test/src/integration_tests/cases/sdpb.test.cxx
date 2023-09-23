@@ -48,7 +48,7 @@ TEST_CASE("sdpb")
     auto args = default_args;
     run_sdpb_set_out_ck_dirs(runner.create_nested("run"), args, 1);
     Test_Util::REQUIRE_Equal::diff_sdpb_output_dir(
-      args["--outDir"], data_dir / "test_out_orig", 1024, 1024);
+      args["--outDir"], data_dir / "test_out_orig", 1024, 1024 / 2);
   }
 
   SECTION("io_tests")

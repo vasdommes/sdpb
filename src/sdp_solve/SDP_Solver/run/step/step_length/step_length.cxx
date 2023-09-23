@@ -37,6 +37,7 @@ El::BigFloat step_length(const Block_Diagonal_Matrix &MCholesky,
   lower_triangular_inverse_congruence(MCholesky, MInvDM);
   const El::BigFloat lambda(min_eigenvalue(MInvDM));
   step_length_timer.stop();
+  Scoped_Timer tttt(timers, timer_name + "_finished");
   if(lambda > -gamma)
     {
       return 1;

@@ -1,9 +1,9 @@
 #include <catch2/catch_amalgamated.hpp>
 
-#include "matrix_multiply/Fmpz_Comb.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Comb.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
-#include "matrix_multiply/Matrix_Normalizer.hxx"
+#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Matrix_Normalizer.hxx"
 
 #include <El.hpp>
 
@@ -94,10 +94,9 @@ TEST_CASE("normalize_and_shift")
       CAPTURE(diff_precision = bits / 2);
 
       El::DistMatrix<El::BigFloat> initial_Q, Q;
-      El::Syrk(El::UpperOrLowerNS::UPPER, El::OrientationNS::TRANSPOSE,
-               El::BigFloat(1), initial_P_matrix, initial_Q);
-      El::Syrk(El::UpperOrLowerNS::UPPER, El::OrientationNS::TRANSPOSE,
-               El::BigFloat(1), P_matrix, Q);
+      El::UpperOrLower uplo = El::UPPER;
+      El::Syrk(uplo, El::OrientationNS::TRANSPOSE, El::BigFloat(1), initial_P_matrix, initial_Q);
+      El::Syrk(uplo, El::OrientationNS::TRANSPOSE, El::BigFloat(1), P_matrix, Q);
 
       {
         INFO("Check that normalized matrix squared has 1.0 on diagonal");
@@ -110,8 +109,9 @@ TEST_CASE("normalize_and_shift")
             }
       }
 
-      normalizer.restore_Q(Q);
-
+      normalizer.restore_Q(uplo, Q);
+      El::MakeSymmetric(uplo, initial_Q);
+      El::MakeSymmetric(uplo, Q);
       DIFF_PREC(initial_Q, Q, diff_precision);
     }
   }
