@@ -153,13 +153,17 @@ TEST_CASE("calculate_Block_Matrix_square")
         // Setup blocks for FLINT+BLAS multiplication
 
         std::vector<El::DistMatrix<El::BigFloat>> blocks;
-        std::vector<size_t> block_indices;
+        std::vector<int> block_indices;
 
         int global_block_offset = 0;
         for(size_t block_index = 0; block_index < block_heights.size();
             ++block_index)
           {
             int block_height = block_heights.at(block_index);
+
+            //            El::DistMatrix<El::BigFloat> block(block_height, block_width,
+            //                                               El::Grid::Default());
+            //            REQUIRE(block.DistComm().Size() == El::mpi::Size(comm));
 
             if(block_index % El::mpi::Size(comm) == El::mpi::Rank(comm))
               {
