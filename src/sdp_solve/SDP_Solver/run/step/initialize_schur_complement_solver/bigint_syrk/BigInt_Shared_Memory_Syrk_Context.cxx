@@ -151,5 +151,8 @@ void BigInt_Shared_Memory_Syrk_Context::bigint_syrk_blas(
 
     fmpz_clear(big_int_value); // TODO use RAII wrapper?
   }
+
+  El::mpi::Barrier(bigint_output.DistComm());
+
   // TODO assert: after synchronize_Q Q(i,i)=2^2N
 }

@@ -23,19 +23,20 @@ inline void compute_matrix_residues(
   //   offset = start_offset + prime_index * prime_stride
   fmpz_t bigint_value;
   fmpz_init(bigint_value);
-  for(int i = 0; i < bigint_input_block.Height(); ++i)
-    for(int j = 0; j < bigint_input_block.Width(); ++j)
+  for(int iLoc = 0; iLoc < bigint_input_block.LocalHeight(); ++iLoc)
+    for(int jLoc = 0; jLoc < bigint_input_block.LocalWidth(); ++jLoc)
       {
-        if(bigint_input_block.IsLocal(i, j))
-          {
-            // pointer to the first residue
-            double *data = block_residues_window.block_residues.at(0)
-                             .at(block_index_in_node)
-                             .Buffer(i, j);
-            BigFloat_to_fmpz_t(bigint_input_block.Get(i, j), bigint_value);
-            fmpz_multi_mod_uint32_stride(
-              data, block_residues_window.prime_stride, bigint_value, comb);
-          }
+        int i = bigint_input_block.GlobalRow(iLoc);
+        int j = bigint_input_block.GlobalCol(jLoc);
+        // pointer to the first residue
+        double *data = block_residues_window.block_residues.at(0)
+                         .at(block_index_in_node)
+                         .Buffer(i, j);
+        BigFloat_to_fmpz_t(bigint_input_block.GetLocal(iLoc, jLoc),
+                           bigint_value);
+        fmpz_multi_mod_uint32_stride(data, block_residues_window.prime_stride,
+                                     bigint_value, comb);
       }
+
   fmpz_clear(bigint_value); // TODO wrap with RAII
 }
