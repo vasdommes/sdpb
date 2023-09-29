@@ -1,4 +1,4 @@
-#include <catch2/catch_amalgamated.hpp>
+#include "catch2/catch_amalgamated.hpp"
 
 #include "test_util/test_util.hxx"
 #include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Shared_Window_Array.hxx"
@@ -110,7 +110,7 @@ TEST_CASE("MPI_Shared_Window")
 
     window.Fence();
 
-    // DIFF(window.block_residues, block_residues); // TODO compile error
+    //     DIFF(window.block_residues, block_residues); // TODO compile error
     for(size_t p = 0; p < num_primes; ++p)
       {
         CAPTURE(p);

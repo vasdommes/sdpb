@@ -341,24 +341,14 @@ def build(bld):
                 )
     bld.program(source=['external/catch2/catch_amalgamated.cpp',
                         'test/src/unit_tests/main.cxx',
+                        'test/src/unit_tests/cases/Matrix_Normalizer.test.cxx',
                         'test/src/unit_tests/cases/block_data_serialization.test.cxx',
-                        'test/src/unit_tests/cases/boost_serialization.test.cxx'],
+                        'test/src/unit_tests/cases/boost_serialization.test.cxx',
+                        'test/src/unit_tests/cases/calculate_matrix_square.test.cxx',
+                        'test/src/unit_tests/cases/shared_window.test.cxx'],
                 target='unit_tests',
                 cxxflags=default_flags,
                 defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],
                 use=use_packages + ['sdp_convert', 'sdp_solve'],
-                includes=default_includes + ['test/src']
-                )
-
-    bld.program(source=['external/catch2/catch_amalgamated.cpp',
-                        'test/src/matrix_multiply_tests/main.cxx',
-                        'test/src/matrix_multiply_tests/cases/Matrix_Normalizer.test.cxx',
-                        'test/src/matrix_multiply_tests/cases/test.cxx',
-                        'test/src/matrix_multiply_tests/cases/shared_window.test.cxx',
-                        'test/src/matrix_multiply_tests/cases/calculate_matrix_square.test.cxx'],
-                target='matrix_multiply_tests',
-                cxxflags=default_flags,
-                defines=default_defines + ['CATCH_AMALGAMATED_CUSTOM_MAIN'],
-                use=use_packages + ['sdp_solve'],
                 includes=default_includes + ['test/src']
                 )
