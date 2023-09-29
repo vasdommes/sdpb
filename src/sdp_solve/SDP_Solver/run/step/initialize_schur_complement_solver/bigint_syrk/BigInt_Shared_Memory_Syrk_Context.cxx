@@ -45,36 +45,36 @@ namespace
 
 BigInt_Shared_Memory_Syrk_Context::BigInt_Shared_Memory_Syrk_Context(
   const El::mpi::Comm &shared_memory_comm, mp_bitcnt_t precision,
-  const std::vector<El::Int> &block_heights, El::Int block_width)
+  const std::vector<El::Int> &block_heights, El::Int block_width,
+  const std::vector<size_t> &block_index_local_to_shmem)
     : shared_memory_comm(shared_memory_comm),
       comb(precision, precision, 1, sum(block_heights)),
       input_block_residues_window(shared_memory_comm, comb.num_primes,
                                   block_heights.size(), block_heights,
                                   block_width),
       output_residues_window(shared_memory_comm, comb.num_primes, block_width,
-                             block_width)
+                             block_width),
+      block_index_local_to_shmem(block_index_local_to_shmem)
 {}
 
 void BigInt_Shared_Memory_Syrk_Context::bigint_syrk_blas(
   El::UpperOrLower uplo,
   const std::vector<El::DistMatrix<El::BigFloat>> &bigint_input_matrix_blocks,
-  const std::vector<size_t> &block_indices_per_shared_memory_comm,
   El::DistMatrix<El::BigFloat> &bigint_output, Timers &timers)
 {
   Scoped_Timer timer(timers, "bigint_syrk_blas");
   size_t width = bigint_output.Width();
 
   // TODO replace asserts with El::RuntimeError?
-  if(bigint_input_matrix_blocks.size()
-     != block_indices_per_shared_memory_comm.size())
+  if(bigint_input_matrix_blocks.size() != block_index_local_to_shmem.size())
     {
       El::RuntimeError("bigint_input_matrix_blocks.size()=",
                        bigint_input_matrix_blocks.size(),
-                       ", block_indices_per_shared_memory_comm.size()=",
-                       block_indices_per_shared_memory_comm.size());
+                       ", block_index_local_to_shmem.size()=",
+                       block_index_local_to_shmem.size());
     }
   assert(bigint_input_matrix_blocks.size()
-         == block_indices_per_shared_memory_comm.size());
+         == block_index_local_to_shmem.size());
 
   assert(bigint_output.Height() == bigint_output.Width());
   assert(bigint_output.Height() == width);
@@ -94,7 +94,7 @@ void BigInt_Shared_Memory_Syrk_Context::bigint_syrk_blas(
       {
         // NB: block_indices should enumerate all blocks
         // from all ranks in current node
-        size_t block_index = block_indices_per_shared_memory_comm.at(i);
+        size_t block_index = block_index_local_to_shmem.at(i);
         const auto &block = bigint_input_matrix_blocks.at(i);
         assert(block.Width() == width);
         compute_matrix_residues(block_index, block, comb,

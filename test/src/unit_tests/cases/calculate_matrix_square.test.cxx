@@ -218,12 +218,11 @@ TEST_CASE("calculate_Block_Matrix_square")
             }
 
           El::UpperOrLower uplo = El::UpperOrLowerNS::UPPER;
-          BigInt_Shared_Memory_Syrk_Context context(comm, bits, block_heights,
-                                                    block_width);
+          BigInt_Shared_Memory_Syrk_Context context(
+            comm, bits, block_heights, block_width, block_indices);
 
           Timers timers(false);
-          context.bigint_syrk_blas(uplo, P_matrix_blocks, block_indices,
-                                   Q_result, timers);
+          context.bigint_syrk_blas(uplo, P_matrix_blocks, Q_result, timers);
           {
             INFO("Check that normalized Q_ii = 1:");
             for(int iLoc = 0; iLoc < Q_result.LocalHeight(); ++iLoc)

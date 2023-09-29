@@ -195,8 +195,9 @@ Matrix_Normalizer::normalize_and_shift_P(El::Matrix<El::BigFloat> &);
 template void
 Matrix_Normalizer::normalize_and_shift_P(El::DistMatrix<El::BigFloat> &);
 
-template <class TMatrices>
-void Matrix_Normalizer::normalize_and_shift_P_blocks(TMatrices &P_matrix_blocks)
+template <class TMatrix_Blocks>
+void Matrix_Normalizer::normalize_and_shift_P_blocks(
+  TMatrix_Blocks &P_matrix_blocks)
 {
   for(auto &block : P_matrix_blocks)
     normalize_and_shift_P(block);
@@ -229,8 +230,8 @@ template void
 Matrix_Normalizer::restore_P(El::DistMatrix<El::BigFloat> &P_block);
 template void Matrix_Normalizer::restore_P(El::Matrix<El::BigFloat> &P_block);
 
-template <class TMatrices>
-void Matrix_Normalizer::restore_P_blocks(TMatrices &P_matrix_blocks)
+template <class TMatrix_Blocks>
+void Matrix_Normalizer::restore_P_blocks(TMatrix_Blocks &P_matrix_blocks)
 {
   for(auto &block : P_matrix_blocks)
     restore_P(block);

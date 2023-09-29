@@ -11,12 +11,13 @@ struct BigInt_Shared_Memory_Syrk_Context : boost::noncopyable
   Fmpz_Comb comb;
   Block_Residue_Matrices_Window<double> input_block_residues_window;
   Residue_Matrices_Window<double> output_residues_window;
+  const std::vector<size_t> block_index_local_to_shmem;
 
   // block_heights - for all blocks in shared memory
-  BigInt_Shared_Memory_Syrk_Context(const El::mpi::Comm &shared_memory_comm,
-                                    mp_bitcnt_t precision,
-                                    const std::vector<El::Int> &block_heights,
-                                    El::Int block_width);
+  BigInt_Shared_Memory_Syrk_Context(
+    const El::mpi::Comm &shared_memory_comm, mp_bitcnt_t precision,
+    const std::vector<El::Int> &block_heights, El::Int block_width,
+    const std::vector<size_t> &block_index_local_to_shmem);
 
   // Calculate Q := P^T P
   //
@@ -39,6 +40,5 @@ struct BigInt_Shared_Memory_Syrk_Context : boost::noncopyable
   void bigint_syrk_blas(
     El::UpperOrLower uplo,
     const std::vector<El::DistMatrix<El::BigFloat>> &bigint_input_matrix_blocks,
-    const std::vector<size_t> &block_indices_per_shared_memory_comm,
     El::DistMatrix<El::BigFloat> &bigint_output, Timers &timers);
 };

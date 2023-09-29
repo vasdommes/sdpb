@@ -29,11 +29,12 @@ public:
 
   // normalize columns of P matrix (or its horizontal band)
   template <class TMatrix> void normalize_and_shift_P(TMatrix &P_block);
-  template <class TMatrices>
-  void normalize_and_shift_P_blocks(TMatrices &P_matrix_blocks);
+  template <class TMatrix_Blocks>
+  void normalize_and_shift_P_blocks(TMatrix_Blocks &P_matrix_blocks);
 
   template <class TMatrix> void restore_P(TMatrix &P_block);
-  template <class TMatrices> void restore_P_blocks(TMatrices &P_matrix_blocks);
+  template <class TMatrix_Blocks>
+  void restore_P_blocks(TMatrix_Blocks &P_matrix_blocks);
 
   template <class TMatrix>
   void restore_Q(El::UpperOrLower uplo, TMatrix &Q_matrix);
