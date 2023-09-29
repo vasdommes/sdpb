@@ -39,6 +39,6 @@ struct BigInt_Shared_Memory_Syrk_Context : boost::noncopyable
   void bigint_syrk_blas(
     El::UpperOrLower uplo,
     const std::vector<El::DistMatrix<El::BigFloat>> &bigint_input_matrix_blocks,
-    const std::vector<int> &block_indices_per_shared_memory_comm,
+    const std::vector<size_t> &block_indices_per_shared_memory_comm,
     El::DistMatrix<El::BigFloat> &bigint_output, Timers &timers);
 };

@@ -164,7 +164,7 @@ TEST_CASE("calculate_Block_Matrix_square")
         }
 
         std::vector<El::DistMatrix<El::BigFloat>> P_matrix_blocks;
-        std::vector<int> block_indices;
+        std::vector<size_t> block_indices;
         {
           INFO("Initialize P_matrix_blocks for FLINT+BLAS "
                "multiplication");
