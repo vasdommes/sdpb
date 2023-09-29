@@ -66,21 +66,9 @@ void initialize_Q_group(const El::mpi::Comm &shared_memory_comm,
   std::map<int, std::vector<int>> block_heights_per_rank;
   for(int rank = 0; rank < num_ranks_per_node; ++rank)
     {
-      std::ostringstream os_rank;
-      El::BuildStream(os_rank, "my_rank=", El::mpi::Rank(shared_memory_comm),
-                      " rank=", rank, ": ");
-      auto ranks_str = os_rank.str();
-
-      El::Output("block.DistComm.Size()=",
-                 schur_off_diagonal.blocks[0].DistComm().Size());
       size_t num_blocks_in_rank = schur_off_diagonal.blocks.size();
       assert(num_blocks_in_rank == block_info.block_indices.size());
-      // TODO remove
-      El::mpi::Barrier();
-      El::Output(ranks_str,
-                 "before broadcast num_blocks_in_rank=", num_blocks_in_rank);
       El::mpi::Broadcast(num_blocks_in_rank, rank, shared_memory_comm);
-      El::Output(ranks_str, "num_blocks_in_rank=", num_blocks_in_rank);
 
       global_block_indices_per_rank.emplace(
         rank, std::vector<size_t>(num_blocks_in_rank));
@@ -107,25 +95,8 @@ void initialize_Q_group(const El::mpi::Comm &shared_memory_comm,
       El::mpi::Broadcast(global_block_indices_per_rank[rank].data(),
                          num_blocks_in_rank, rank, shared_memory_comm);
 
-      {
-        std::ostringstream os;
-        os << ranks_str << "global_block_indices_per_rank[rank]=";
-        for(auto index : global_block_indices_per_rank[rank])
-          os << " " << index;
-        El::Output(os.str());
-      }
-      // TODO remove
-      El::mpi::Barrier();
       El::mpi::Broadcast(block_heights_per_rank[rank].data(),
                          num_blocks_in_rank, rank, shared_memory_comm);
-      {
-        std::ostringstream os;
-        os << ranks_str << "block_heights_per_rank[rank]=";
-        for(auto index : block_heights_per_rank[rank])
-          os << " " << index;
-        El::Output(os.str());
-      }
-
       El::mpi::Barrier();
     }
 
@@ -165,10 +136,6 @@ void initialize_Q_group(const El::mpi::Comm &shared_memory_comm,
       block_index_local_to_shmem[local_index] = shmem_index;
     }
 
-  // TODO for debug
-  //  std::vector<int> block_index_local_to_shmem = {0};
-  //  std::vector<int> shmem_block_index_to_height = {5};
-
   int block_width = Q_group.Width();
   BigInt_Shared_Memory_Syrk_Context context(
     shared_memory_comm, El::gmp::Precision(), shmem_block_index_to_height,
@@ -196,15 +163,6 @@ void initialize_Q_group(const El::mpi::Comm &shared_memory_comm,
   //          }
   //      }
   normalizer.restore_Q(uplo, Q_group);
-
-  for(size_t block = 0; block < schur_complement_cholesky.blocks.size();
-      ++block)
-    {
-      El::Output(El::DimsString(schur_off_diagonal.blocks[block]),
-                 "block_" + std::to_string(block));
-      El::Print(schur_off_diagonal.blocks[block]);
-      El::Output("-------");
-    }
 
   //  int block_width = Q_group.Width();
   //  auto uplo = El::UPPER;
@@ -248,16 +206,10 @@ void compute_Q(const SDP &sdp, const Block_Info &block_info,
   MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
                       &shared_memory_comm);
   const El::Grid grid(shared_memory_comm);
-  //  El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), grid);
-  El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), group_grid);
+  El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), grid);
+  //  El::DistMatrix<El::BigFloat> Q_group(Q.Height(), Q.Width(), group_grid);
   initialize_Q_group(shared_memory_comm, sdp, block_info, schur_complement,
                      schur_off_diagonal, schur_complement_cholesky, Q_group,
                      timers);
-  El::mpi::Barrier();
   synchronize_Q(Q, Q_group, timers);
-  El::mpi::Barrier();
-  El::Output(El::mpi::Rank(), " Finished compute_Q");
-  El::Output(El::DimsString(Q));
-  El::Print(Q, "Q:" + std::to_string(El::mpi::Size()));
-  El::Output();
 }

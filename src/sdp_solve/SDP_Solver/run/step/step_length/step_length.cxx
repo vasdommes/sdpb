@@ -34,14 +34,9 @@ El::BigFloat step_length(const Block_Diagonal_Matrix &MCholesky,
         timers.add_and_start(timer_name));
   // MInvDM = L^{-1} dM L^{-T}, where M = L L^T
   Block_Diagonal_Matrix MInvDM(dM);
-  //  El::Output(El::mpi::Rank()," MInvDM(dM) ", timer_name);
   lower_triangular_inverse_congruence(MCholesky, MInvDM);
-  El::Output(El::mpi::Rank(), " lower_triangular_inverse_congruence ",
-             timer_name);
   const El::BigFloat lambda(min_eigenvalue(MInvDM));
-  El::Output(El::mpi::Rank(), " min_eigenvalue ", timer_name);
   step_length_timer.stop();
-  El::Output(El::mpi::Rank(), " finished ", timer_name);
   if(lambda > -gamma)
     {
       return 1;

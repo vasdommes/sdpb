@@ -9,7 +9,6 @@ El::BigFloat min_eigenvalue(Block_Diagonal_Matrix &A)
 {
   El::BigFloat local_min(El::limits::Max<El::BigFloat>());
 
-  El::Output(El::mpi::Rank(), " A.blocks.size()=", A.blocks.size());
   for(auto &block : A.blocks)
     {
       El::DistMatrix<El::BigFloat, El::VR, El::STAR> eigenvalues(block.Grid());
@@ -26,12 +25,9 @@ El::BigFloat min_eigenvalue(Block_Diagonal_Matrix &A)
       /// The default number of iterations is 40.  That is sometimes
       /// not enough, so we bump it up significantly.
       hermitian_eig_ctrl.tridiagEigCtrl.dcCtrl.secularCtrl.maxIterations = 16384;
-      El::Output(El::mpi::Rank(), " start El::HermitianEig");
       El::HermitianEig(El::UpperOrLowerNS::LOWER, block, eigenvalues,
                        hermitian_eig_ctrl);
-      El::Output(El::mpi::Rank(), " end El::HermitianEig");
       local_min = El::Min(local_min, El::Min(eigenvalues));
-      El::Output(El::mpi::Rank(), " local_min=", local_min);
     }
   return El::mpi::AllReduce(local_min, El::mpi::MIN, El::mpi::COMM_WORLD);
 }
