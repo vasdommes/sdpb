@@ -1,6 +1,5 @@
 #include "catch2/catch_amalgamated.hpp"
 
-#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Comb.hxx"
 #include "test_util/test_util.hxx"
 #include "unit_tests/util/util.hxx"
 #include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/BigInt_Shared_Memory_Syrk_Context.hxx"
@@ -12,8 +11,11 @@
 
 using Test_Util::REQUIRE_Equal::diff;
 
+// Helper functions for calculating Q = P^T P
+// using different methods
 namespace
 {
+  // Calculate Q = P^T P using El::Syrk
   El::Matrix<El::BigFloat>
   calculate_matrix_square_El_Syrk(const El::Matrix<El::BigFloat> &P_matrix)
   {
@@ -24,6 +26,7 @@ namespace
     return Q_result_El_Syrk;
   }
 
+  // Calculate Q = P^T P using El::Gemm
   El::Matrix<El::BigFloat>
   calculate_matrix_square_El_Gemm(const El::Matrix<El::BigFloat> &P_matrix)
   {
@@ -33,6 +36,7 @@ namespace
     return Q_result_El_Gemm;
   }
 
+  // Calculate Q = P^T P using fmpz_mat_mul_blas:
   // - Normalize, convert to fmpz (big integers)
   // - Calculate residues (mod a bunch of primes)
   // - Multiply matrices of residues via BLAS
@@ -71,8 +75,10 @@ namespace
 
 TEST_CASE("calculate_Block_Matrix_square")
 {
-  // input: dense tall NxK matrix P, splitted horizontally into blocks
-  // output: NxN matrix Q := P^T * P
+  INFO("input: dense tall NxK matrix P, splitted horizontally into blocks");
+  INFO("output: NxN matrix Q := P^T P");
+  INFO("We calculate Q with different methods, including our bigint_syrk_blas,"
+       ", and compare the results.");
 
   MPI_Comm comm;
   MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
@@ -82,223 +88,182 @@ TEST_CASE("calculate_Block_Matrix_square")
     REQUIRE(El::mpi::Congruent(comm, El::mpi::COMM_WORLD));
   }
 
-  // TODO fails with for loop in Release mode!
-  // but works without for loop, or in Debug node
-  for(size_t block_width : {1, 10})
-    for(size_t num_blocks : {1, 10, 100, 500, 1000})
-      //    for(size_t num_blocks : {100})
-      DYNAMIC_SECTION("num_blocks=" << num_blocks
-                                    << " block_width=" << block_width)
-      //  size_t num_blocks=10; size_t block_width=5;
+  CAPTURE(El::mpi::Rank());
+  CAPTURE(El::mpi::Rank(comm));
+  const El::Grid comm_grid(comm);
+
+  int block_width = GENERATE(1, 10);
+  DYNAMIC_SECTION("P_width=" << block_width)
+  {
+    int total_block_height = GENERATE(1, 10, 100, 1000);
+    auto block_heights = Test_Util::random_split(total_block_height);
+    size_t num_blocks = block_heights.size();
+
+    DYNAMIC_SECTION("P_height=" << total_block_height
+                                << " num_blocks=" << num_blocks)
+    {
+      bool use_dist_blocks = GENERATE(false, true);
+      if(use_dist_blocks)
+        INFO("Each block is a DistMatrix over a communicator");
+      else
+        INFO("Each block is stored on a single rank");
+
+      DYNAMIC_SECTION("use_dist_blocks=" << use_dist_blocks)
       {
-        CAPTURE(num_blocks);
-        CAPTURE(block_width);
-
-        std::vector<El::Int> block_heights(num_blocks);
-        size_t total_block_height = 0;
-        // TODO assign random heights, as in Matrix_Normalizer.test
-        for(size_t block_index = 0; block_index < num_blocks; ++block_index)
-          {
-            size_t height = block_index + 100;
-            //            size_t height = 1;
-            block_heights.at(block_index) = height;
-            total_block_height += height;
-          }
-        CAPTURE(total_block_height);
-
         int bits;
         CAPTURE(bits = El::gmp::Precision());
         int diff_precision;
+        // In general, different calculations may give different results.
+        // We cannot control the resulting precision exactly,
+        // e.g. due to possible catastrophic cancellation.
+        // If we are doing everything correctly, then we can expect
+        // that results coincide up to bits/2 in most of the cases, this feels robust enough.
+        // If we made a mistake, then usually the result is completely different,
+        // so the test will fail.
         CAPTURE(diff_precision = bits / 2);
 
         // P_matrix is a tall matrix of all blocks.
         // We initialize it on rank=0 and then copy to all ranks.
         El::Matrix<El::BigFloat> P_matrix(total_block_height, block_width);
         El::Matrix<El::BigFloat> Q_result_El_Syrk(block_width, block_width);
-        if(El::mpi::Rank() == 0)
-          {
-            P_matrix
-              = Test_Util::random_matrix(total_block_height, block_width);
 
-            // Fill with 1.0 - for easier debug:
-            // El::Fill(P_matrix, El::BigFloat(1.0));
+        {
+          INFO("Initialize P_matrix and calculate local Q with builtin "
+               "Elemental and FLINT methods");
+          if(El::mpi::Rank() == 0)
+            {
+              P_matrix
+                = Test_Util::random_matrix(total_block_height, block_width);
 
-            Q_result_El_Syrk = calculate_matrix_square_El_Syrk(P_matrix);
+              // Fill with 1.0 - for easier debug:
+              // El::Fill(P_matrix, El::BigFloat(1.0));
 
-            // Double-check our result with Gemm
-            auto Q_result_El_Gemm = calculate_matrix_square_El_Gemm(P_matrix);
-            DIFF(Q_result_El_Syrk, Q_result_El_Gemm);
+              Q_result_El_Syrk = calculate_matrix_square_El_Syrk(P_matrix);
 
-            // Check fmpz_mat_mul_blas, which is essentially
-            // the same as our method.
-            auto Q_result_fmpz_mat_mul_blas
-              = calculate_matrix_square_fmpz_mat_mul_blas(P_matrix, bits);
-            DIFF_PREC(Q_result_El_Syrk, Q_result_fmpz_mat_mul_blas,
-                      diff_precision);
-            INFO("after DIFF_PREC(Q_result_El_Syrk, "
-                 "Q_result_fmpz_mat_mul_blas, diff_precision);");
-          }
+              // Double-check our result with Gemm
+              auto Q_result_El_Gemm
+                = calculate_matrix_square_El_Gemm(P_matrix);
+              DIFF(Q_result_El_Syrk, Q_result_El_Gemm);
 
-        //
-        El::mpi::Broadcast(P_matrix.Buffer(), P_matrix.MemorySize(), 0,
-                           El::mpi::COMM_WORLD);
-        // Send copies of Q_result_El_Syrk to all ranks, to make comparison easy
-        // TODO use DistMatrix instead?
-        El::mpi::Broadcast(Q_result_El_Syrk.Buffer(),
-                           Q_result_El_Syrk.MemorySize(), 0,
-                           El::mpi::COMM_WORLD);
-        //        CAPTURE(P_matrix);
-        CAPTURE(Q_result_El_Syrk);
+              // Check fmpz_mat_mul_blas, which is mathematically
+              // the same as our bigint_syrk_blas method.
+              auto Q_result_fmpz_mat_mul_blas
+                = calculate_matrix_square_fmpz_mat_mul_blas(P_matrix, bits);
+              DIFF_PREC(Q_result_El_Syrk, Q_result_fmpz_mat_mul_blas,
+                        diff_precision);
+            }
 
-        // Setup blocks for FLINT+BLAS multiplication
+          //
+          El::mpi::Broadcast(P_matrix.Buffer(), P_matrix.MemorySize(), 0,
+                             El::mpi::COMM_WORLD);
+          // Send copies of Q_result_El_Syrk to all ranks, to make comparison easy
+          // TODO use DistMatrix instead?
+          El::mpi::Broadcast(Q_result_El_Syrk.Buffer(),
+                             Q_result_El_Syrk.MemorySize(), 0,
+                             El::mpi::COMM_WORLD);
+        }
 
-        std::vector<El::DistMatrix<El::BigFloat>> blocks;
+        std::vector<El::DistMatrix<El::BigFloat>> P_matrix_blocks;
         std::vector<int> block_indices;
+        {
+          INFO("Initialize P_matrix_blocks for FLINT+BLAS "
+               "multiplication");
 
-        int global_block_offset = 0;
-        for(size_t block_index = 0; block_index < block_heights.size();
-            ++block_index)
-          {
-            int block_height = block_heights.at(block_index);
+          // Each block is either distributed over all comm,
+          // or belongs to a single rank
+          const auto &block_grid
+            = use_dist_blocks ? comm_grid : El::Grid::Trivial();
 
-            //            El::DistMatrix<El::BigFloat> block(block_height, block_width,
-            //                                               El::Grid::Default());
-            //            REQUIRE(block.DistComm().Size() == El::mpi::Size(comm));
+          int global_block_offset = 0;
+          for(size_t block_index = 0; block_index < block_heights.size();
+              ++block_index)
+            {
+              int block_height = block_heights.at(block_index);
 
-            if(block_index % El::mpi::Size(comm) == El::mpi::Rank(comm))
-              {
-                // TODO test for DistMatrix distributed over several ranks
-                El::DistMatrix<El::BigFloat> block(block_height, block_width,
-                                                   El::Grid::Trivial());
+              El::DistMatrix<El::BigFloat> block(block_height, block_width,
+                                                 block_grid);
 
-                for(int i = 0; i < block.LocalHeight(); ++i)
-                  for(int j = 0; j < block.LocalWidth(); ++j)
-                    {
-                      int global_row
-                        = block.GlobalRow(i) + global_block_offset;
-                      int global_col = block.GlobalCol(j);
-                      block.SetLocal(i, j,
-                                     P_matrix.Get(global_row, global_col));
-                    }
-                // TODO block indices for window!
-                block_indices.push_back(block_index);
-                blocks.push_back(block);
-              }
-            global_block_offset += block_height;
-          }
-        //  CAPTURE(blocks.at(0).Get(0, 0));
-        //  CAPTURE(blocks.at(0).Get(0, 0) * blocks.at(0).Get(0, 0));
+              // If block goes for a single rank, then we assign blocks to ranks in a round-robin manner.
+              if(use_dist_blocks
+                 || block_index % El::mpi::Size(comm) == El::mpi::Rank(comm))
+                {
+                  for(int iLoc = 0; iLoc < block.LocalHeight(); ++iLoc)
+                    for(int jLoc = 0; jLoc < block.LocalWidth(); ++jLoc)
+                      {
+                        int global_row
+                          = block.GlobalRow(iLoc) + global_block_offset;
+                        int global_col = block.GlobalCol(jLoc);
+                        block.SetLocal(iLoc, jLoc,
+                                       P_matrix.Get(global_row, global_col));
+                      }
+                  // TODO block indices for window!
+                  block_indices.push_back(block_index);
+                  P_matrix_blocks.push_back(block);
+                }
+              global_block_offset += block_height;
+            }
+        }
 
-        const El::Grid result_grid(comm);
-
-        // calculate via BLAS
-
-        // blocks are distributed among all ranks
-        Matrix_Normalizer normalizer(blocks, block_width, bits,
-                                     El::mpi::COMM_WORLD);
-        CAPTURE(normalizer.column_norms);
-        for(auto &block : blocks)
-          {
-            //        El::Output(El::mpi::Rank(), "normalize_and_shift");
-            normalizer.normalize_and_shift_P(block);
-          }
-
-        //  CAPTURE(blocks[0].Get(0, 0));
-
-        // TODO test normalization
-
-        // TODO grid
-        //  auto& result_grid = El::Grid::Default();
-        //  const El::Grid result_grid(El::mpi::COMM_WORLD);
-
+        // calculate Q = P^T P using bigint_syrk_blas
         El::DistMatrix<El::BigFloat> Q_result(block_width, block_width,
-                                              result_grid);
+                                              comm_grid);
+        {
+          // blocks are distributed among all ranks, thus COMM_WORLD
+          Matrix_Normalizer normalizer(P_matrix_blocks, block_width, bits,
+                                       El::mpi::COMM_WORLD);
+          CAPTURE(normalizer.column_norms);
+          for(auto &block : P_matrix_blocks)
+            {
+              normalizer.normalize_and_shift_P(block);
+            }
 
-        El::UpperOrLower uplo = El::UpperOrLowerNS::UPPER;
-        BigInt_Shared_Memory_Syrk_Context context(comm, bits, block_heights,
-                                                  block_width);
+          El::UpperOrLower uplo = El::UpperOrLowerNS::UPPER;
+          BigInt_Shared_Memory_Syrk_Context context(comm, bits, block_heights,
+                                                    block_width);
 
-        Timers timers(false);
-        context.bigint_syrk_blas(uplo, blocks, block_indices, Q_result,
-                                 timers);
-
-        //                Block_Residue_Matrices_Window<double> block_residues_window(
-        //                  comm, comb.num_primes, block_heights.size(), block_heights,
-        //                  block_width);
-        //                Residue_Matrices_Window<double> result_residues_window(
-        //                  comm, comb.num_primes, block_width, block_width);
-        //        calculate_Block_Matrix_square(comm, blocks, block_indices,
-        //                                      block_residues_window,
-        //                                      result_residues_window, comb, Q_result);
-
-        // TODO once
-        El::MakeSymmetric(uplo, Q_result);
-
-        CAPTURE(num_blocks);
-        CAPTURE(block_width);
-        if(El::mpi::Rank() == 0)
+          Timers timers(false);
+          context.bigint_syrk_blas(uplo, P_matrix_blocks, block_indices,
+                                   Q_result, timers);
           {
-            //            std::vector<double> block_residues(
-            //              block_residues_window.residues[0].LockedBuffer(),
-            //              block_residues_window.residues[0].LockedBuffer()
-            //                + primes.size() * num_blocks);
-            //
-            //            std::vector<double> result_residues(
-            //              result_residues_window.residues[0].LockedBuffer(),
-            //              result_residues_window.residues[0].LockedBuffer()
-            //                + primes.size());
-            //
-            std::vector<double> result_00_residues;
-            double max_Q_residue = 0;
-            for(const auto &matrix : context.output_residues_window.residues)
-              {
-                double residue = matrix.Get(0, 0);
-                result_00_residues.emplace_back(residue);
-                max_Q_residue = std::max(residue, max_Q_residue);
-              }
-
-            CAPTURE(result_00_residues);
-
-            //            CAPTURE(comb.primes.at(0));
-            //            auto max_uint32_P_residue = comb.primes.at(0) / 2;
-            //            CAPTURE(max_uint32_P_residue * max_uint32_P_residue
-            //                    * total_block_height);
-            //            CAPTURE(max_Q_residue);
-            //            REQUIRE((double)max_uint32_P_residue * max_uint32_P_residue
-            //                      * total_block_height
-            //                    >= max_Q_residue);
-            CAPTURE(std::numeric_limits<uint32_t>::max());
-            CAPTURE(std::numeric_limits<slong>::max());
-
-            CAPTURE(Q_result.Matrix());
-            // FAIL();
+            INFO("Check that normalized Q_ii = 1:");
+            for(int iLoc = 0; iLoc < Q_result.LocalHeight(); ++iLoc)
+              for(int jLoc = 0; jLoc < Q_result.LocalWidth(); ++jLoc)
+                {
+                  int i = Q_result.GlobalRow(iLoc);
+                  int j = Q_result.GlobalCol(jLoc);
+                  if(i == j)
+                    {
+                      CAPTURE(i);
+                      auto value = Q_result.GetLocal(iLoc, jLoc);
+                      DIFF_PREC(value >> 2 * normalizer.precision,
+                                El::BigFloat(1), diff_precision);
+                    }
+                }
           }
 
-        //  INFO("normshifted Q_result:");
-        //  CAPTURE(Q_result);
-        //  INFO("restore...");
-        normalizer.restore_Q(uplo, Q_result);
-        El::MakeSymmetric(uplo, Q_result);
+          normalizer.restore_Q(uplo, Q_result);
+          El::MakeSymmetric(uplo, Q_result);
+        }
+
+        // Check the result
 
         CAPTURE(Q_result);
 
-        for(int i = 0; i < Q_result.LocalHeight(); ++i)
-          for(int j = 0; j < Q_result.LocalWidth(); ++j)
+        for(int iLoc = 0; iLoc < Q_result.LocalHeight(); ++iLoc)
+          for(int jLoc = 0; jLoc < Q_result.LocalWidth(); ++jLoc)
             {
-              CAPTURE(El::mpi::Rank());
-              CAPTURE(i);
-              CAPTURE(j);
-              auto global_row = Q_result.GlobalRow(i);
-              auto global_col = Q_result.GlobalCol(j);
+              CAPTURE(iLoc);
+              CAPTURE(jLoc);
+              auto global_row = Q_result.GlobalRow(iLoc);
+              auto global_col = Q_result.GlobalCol(jLoc);
               CAPTURE(global_row);
               CAPTURE(global_col);
 
-              CAPTURE(El::gmp::Precision());
-              CAPTURE(FLINT_BIT_COUNT(total_block_height));
-
-              DIFF_PREC(Q_result.GetLocal(i, j),
+              DIFF_PREC(Q_result.GetLocal(iLoc, jLoc),
                         Q_result_El_Syrk.Get(global_row, global_col),
                         diff_precision);
             }
       }
+    }
+  }
 }

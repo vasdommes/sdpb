@@ -53,4 +53,21 @@ namespace Test_Util
 
     return matrix;
   }
+
+  // Split n>0 into sum of random positive integers n1+n2+...
+  template <class TInt> inline std::vector<TInt> random_split(TInt n)
+  {
+    std::vector<TInt> result;
+
+    std::default_random_engine rand_engine;
+
+    while(n > 0)
+      {
+        std::uniform_int_distribution<TInt> dist(1, n);
+        int curr = dist(rand_engine);
+        result.push_back(curr);
+        n -= curr;
+      }
+    return result;
+  }
 }

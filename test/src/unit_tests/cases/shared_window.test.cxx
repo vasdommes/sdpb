@@ -61,11 +61,7 @@ TEST_CASE("MPI_Shared_Window")
     window.Fence();
 
     for(size_t p = 0; p < num_primes; ++p)
-      for(size_t i = 0; i < height; ++i)
-        for(size_t j = 0; j < width; ++j)
-          {
-            DIFF(window.residues.at(p)(i, j), matrices.at(p)(i, j));
-          }
+      DIFF(window.residues.at(p), matrices.at(p));
   }
 
   SECTION("Block_Residue_Matrices_Window")
@@ -73,10 +69,6 @@ TEST_CASE("MPI_Shared_Window")
     size_t num_primes = 10;
     size_t num_blocks = 21;
     size_t width = 32;
-
-    //    num_primes = 1;
-    //    num_blocks= 10;
-    //    width = 100;
 
     std::vector<std::vector<El::Matrix<double>>> block_residues(num_primes);
     std::vector<El::Int> block_heights(num_blocks);
@@ -110,7 +102,6 @@ TEST_CASE("MPI_Shared_Window")
 
     window.Fence();
 
-    //     DIFF(window.block_residues, block_residues); // TODO compile error
     for(size_t p = 0; p < num_primes; ++p)
       {
         CAPTURE(p);
@@ -118,8 +109,8 @@ TEST_CASE("MPI_Shared_Window")
         for(size_t b = 0; b < num_blocks; ++b)
           {
             CAPTURE(b);
-            DIFF(window.block_residues.at(p).at(b),
-                 block_residues.at(p).at(b));
+            DIFF(window.block_residues[p][b],
+                 block_residues[p][b]);
 
             INFO("Check that window.block_residues contains "
                  "submatrices of window.residues:");
@@ -131,8 +122,8 @@ TEST_CASE("MPI_Shared_Window")
                 for(int j = 0; j < width; ++j)
                   {
                     CAPTURE(j);
-                    DIFF(window.block_residues.at(p).at(b)(i, j),
-                         window.residues.at(p)(i + global_start_row, j));
+                    DIFF(window.block_residues[p][b](i, j),
+                         window.residues[p](i + global_start_row, j));
                   }
               }
             global_start_row += height;
