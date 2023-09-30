@@ -1,4 +1,6 @@
 #include "../../SDP_Solver.hxx"
+#include "bigint_syrk/BigInt_Shared_Memory_Syrk_Context.hxx"
+#include "bigint_syrk/initialize_bigint_syrk_context.hxx"
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 // The main solver loop
@@ -164,11 +166,13 @@ SDP_Solver::run(const Solver_Parameters &parameters,
           break;
         }
 
+      auto bigint_syrk_context
+        = initialize_bigint_syrk_context(block_info, sdp);
       El::BigFloat mu, beta_corrector;
       step(parameters, total_psd_rows, is_primal_and_dual_feasible, block_info,
            sdp, grid, X_cholesky, Y_cholesky, A_X_inv, A_Y, primal_residue_p,
-           mu, beta_corrector, primal_step_length, dual_step_length,
-           terminate_now, timers);
+           bigint_syrk_context, mu, beta_corrector, primal_step_length,
+           dual_step_length, terminate_now, timers);
       if(terminate_now)
         {
           terminate_reason

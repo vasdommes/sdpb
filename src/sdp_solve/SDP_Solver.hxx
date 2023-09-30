@@ -13,6 +13,7 @@
 
 #include "Solver_Parameters.hxx"
 #include "../Timers.hxx"
+#include "SDP_Solver/run/bigint_syrk/BigInt_Shared_Memory_Syrk_Context.hxx"
 
 #include <filesystem>
 
@@ -98,7 +99,8 @@ public:
     const std::array<
       std::vector<std::vector<std::vector<El::DistMatrix<El::BigFloat>>>>, 2>
       &A_Y,
-    const Block_Vector &primal_residue_p, El::BigFloat &mu,
+    const Block_Vector &primal_residue_p,
+    BigInt_Shared_Memory_Syrk_Context &bigint_syrk_context, El::BigFloat &mu,
     El::BigFloat &beta_corrector, El::BigFloat &primal_step_length,
     El::BigFloat &dual_step_length, bool &terminate_now, Timers &timers);
 

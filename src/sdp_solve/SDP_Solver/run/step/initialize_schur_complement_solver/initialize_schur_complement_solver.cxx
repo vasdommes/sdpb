@@ -1,6 +1,7 @@
 #include "../../../../SDP.hxx"
 #include "../../../../Block_Diagonal_Matrix.hxx"
 #include "../../../../../Timers.hxx"
+#include "../../bigint_syrk/BigInt_Shared_Memory_Syrk_Context.hxx"
 
 // Compute the quantities needed to solve the Schur complement
 // equation
@@ -52,6 +53,7 @@ void compute_Q(const SDP &sdp, const Block_Info &block_info,
                const Block_Diagonal_Matrix &schur_complement,
                Block_Matrix &schur_off_diagonal,
                Block_Diagonal_Matrix &schur_complement_cholesky,
+               BigInt_Shared_Memory_Syrk_Context &bigint_syrk_context,
                El::DistMatrix<El::BigFloat> &Q, Timers &timers);
 
 void synchronize_Q(El::DistMatrix<El::BigFloat> &Q,
@@ -67,8 +69,9 @@ void initialize_schur_complement_solver(
     std::vector<std::vector<std::vector<El::DistMatrix<El::BigFloat>>>>, 2>
     &A_Y,
   const El::Grid &group_grid, Block_Diagonal_Matrix &schur_complement_cholesky,
-  Block_Matrix &schur_off_diagonal, El::DistMatrix<El::BigFloat> &Q,
-  Timers &timers)
+  Block_Matrix &schur_off_diagonal,
+  BigInt_Shared_Memory_Syrk_Context &bigint_syrk_context,
+  El::DistMatrix<El::BigFloat> &Q, Timers &timers)
 {
   Scoped_Timer initialize_timer(timers,
                                 "run.step.initializeSchurComplementSolver");
@@ -83,7 +86,7 @@ void initialize_schur_complement_solver(
   compute_schur_complement(block_info, A_X_inv, A_Y, schur_complement, timers);
 
   compute_Q(sdp, block_info, schur_complement, schur_off_diagonal,
-            schur_complement_cholesky, Q, timers);
+            schur_complement_cholesky, bigint_syrk_context, Q, timers);
 
   auto &Cholesky_timer(
     timers.add_and_start("run.step.initializeSchurComplementSolver."

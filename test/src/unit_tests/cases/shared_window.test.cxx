@@ -1,7 +1,7 @@
 #include "catch2/catch_amalgamated.hpp"
 
 #include "test_util/test_util.hxx"
-#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Shared_Window_Array.hxx"
+#include "sdp_solve/SDP_Solver/run/bigint_syrk/Shared_Window_Array.hxx"
 
 #include <vector>
 #include <El.hpp>

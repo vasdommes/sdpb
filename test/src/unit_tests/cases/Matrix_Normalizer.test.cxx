@@ -1,13 +1,10 @@
 #include "catch2/catch_amalgamated.hpp"
 
-#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Fmpz_Comb.hxx"
-#include "test_util/test_util.hxx"
+#include "sdp_solve/SDP_Solver/run/bigint_syrk/Fmpz_Comb.hxx"
 #include "unit_tests/util/util.hxx"
-#include "sdp_solve/SDP_Solver/run/step/initialize_schur_complement_solver/bigint_syrk/Matrix_Normalizer.hxx"
+#include "sdp_solve/SDP_Solver/run/bigint_syrk/Matrix_Normalizer.hxx"
 
 #include <El.hpp>
-
-#include <random>
 
 using Test_Util::REQUIRE_Equal::diff;
 
