@@ -17,7 +17,9 @@ void write_timing(const fs::path &checkpoint_out, const Block_Info &block_info, 
   for(auto &index : block_info.block_indices)
     {
       block_timings(index, 0) =
-        // TODO
+        // TODO now Q.syrk works together for all blocks on the node,
+        // so we cannot account for individual block.
+        // We can either ignore it or assign some timing proportional to the size of the block
         //        timers.elapsed_milliseconds(
         //                                  "run.step.initializeSchurComplementSolver."
         //                                  "Q.syrk_"
@@ -30,6 +32,7 @@ void write_timing(const fs::path &checkpoint_out, const Block_Info &block_info, 
                                     "run.step.initializeSchurComplementSolver."
                                     "Q.cholesky_"
                                     + std::to_string(index));
+      // TODO account for compute_schur_complement too?
     }
   El::AllReduce(block_timings, El::mpi::COMM_WORLD);
   if(El::mpi::Rank() == 0)
