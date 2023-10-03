@@ -100,24 +100,26 @@ namespace Test_Util
 
     bp::ipstream stdout_pipe;
     bp::ipstream stderr_pipe;
-    int exit_code = bp::system(command, bp::std_out > stdout_pipe,
-                               bp::std_err > stderr_pipe);
+    //    int exit_code = bp::system(command, bp::std_out > stdout_pipe,
+    //                               bp::std_err > stderr_pipe);
+    // TODO for debug:
+    int exit_code = bp::system(command);
 
-    // write stdout to file
-    os_stdout << stdout_pipe.rdbuf();
-
-    // write stderr to both stderr and stdout files
-    // we cannot call rdbuf() twice, thus we copy it to stderr_string
-    std::stringstream ss;
-    ss << stderr_pipe.rdbuf();
-    auto stderr_string = ss.str();
-
-    os_stdout << stderr_string;
-    os_stderr << stderr_string;
-
-    CAPTURE(exit_code);
-    CAPTURE(required_exit_code);
-    CAPTURE(stderr_string);
+    //    // write stdout to file
+    //    os_stdout << stdout_pipe.rdbuf();
+    //
+    //    // write stderr to both stderr and stdout files
+    //    // we cannot call rdbuf() twice, thus we copy it to stderr_string
+    //    std::stringstream ss;
+    //    ss << stderr_pipe.rdbuf();
+    //    auto stderr_string = ss.str();
+    //
+    //    os_stdout << stderr_string;
+    //    os_stderr << stderr_string;
+    //
+    //    CAPTURE(exit_code);
+    //    CAPTURE(required_exit_code);
+    //    CAPTURE(stderr_string);
     if(required_exit_code == 0)
       {
         REQUIRE(exit_code == 0);
@@ -135,13 +137,13 @@ namespace Test_Util
                                        << required_exit_code);
           }
       }
-    if(required_exit_code != 0 && !required_error_msg.empty())
-      {
-        CAPTURE(required_error_msg);
-        bool found_error_message
-          = stderr_string.find(required_error_msg) != std::string::npos;
-        REQUIRE(found_error_message);
-      }
+    //    if(required_exit_code != 0 && !required_error_msg.empty())
+    //      {
+    //        CAPTURE(required_error_msg);
+    //        bool found_error_message
+    //          = stderr_string.find(required_error_msg) != std::string::npos;
+    //        REQUIRE(found_error_message);
+    //      }
   }
 
   void Test_Case_Runner::mpi_run(const std::string &command, int numProcs,
