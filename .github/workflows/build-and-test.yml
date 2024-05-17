@@ -1,0 +1,82 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # In this step, this action saves a list of existing images,
+      # the cache is created without them in the post run.
+      # It also restores the cache if it exists.
+      - name: Enable Docker Layer Caching
+        uses: jpribyl/action-docker-layer-caching@v0.1.1
+        # Ignore the failure of a step and avoid terminating the job.
+        continue-on-error: true
+
+      # sdpb image
+      - name: Build and export sdpb image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: sdpb
+          outputs: type=docker,dest=/tmp/sdpb.tar
+      - name: Upload sdpb artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sdpb
+          path: /tmp/sdpb.tar
+
+      # sdpb-test image
+      - name: Build and export sdpb-test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: sdpb-test
+          target: test
+          outputs: type=docker,dest=/tmp/sdpb-test.tar
+      - name: Upload sdpb-test artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sdpb-test
+          path: /tmp/sdpb-test.tar
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download sdpb artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sdpb
+          path: /tmp
+      - name: Download sdpb-test artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sdpb-test
+          path: /tmp
+          
+      - name: Load images
+        run: |
+          docker load --input /tmp/sdpb.tar
+          docker load --input /tmp/sdpb-test.tar
+          docker image ls -a
+
+      - name: Run sdpb --help
+        run: docker run sdpb sdpb --help
+
+      - name: Run all tests
+        run: docker run sdpb-test ./test/run_all_tests.sh mpirun --oversubscribe
+
+      
