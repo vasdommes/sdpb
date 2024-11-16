@@ -6,6 +6,8 @@
 //=======================================================================
 
 #include "SDPB_Parameters.hxx"
+#include "sdpb_util/Proc_Meminfo.hxx"
+#include "sdpb_util/ostream/pretty_print_bytes.hxx"
 
 #include <El.hpp>
 
@@ -13,14 +15,22 @@
 
 namespace fs = std::filesystem;
 
-Timers solve(const Block_Info &block_info, const SDPB_Parameters &parameters);
+Timers solve(const Block_Info &block_info, const SDPB_Parameters &parameters,
+             const Environment &env,
+             const std::chrono::time_point<std::chrono::high_resolution_clock>
+               &start_time,
+             El::Matrix<int32_t> &block_timings_ms);
 
-void write_timing(const fs::path &checkpoint_out, const Block_Info &block_info, const Timers &timers,
-                  const bool &debug, El::Matrix<int32_t> &block_timings);
+void write_block_timings(const fs::path &checkpoint_out,
+                         const Block_Info &block_info,
+                         const El::Matrix<int32_t> &block_timings_ms,
+                         Verbosity verbosity);
+
+void write_profiling(const fs::path &checkpoint_out, const Timers &timers);
 
 int main(int argc, char **argv)
 {
-  El::Environment env(argc, argv);
+  Environment env(argc, argv);
 
   try
     {
@@ -30,18 +40,44 @@ int main(int argc, char **argv)
           return 0;
         }
 
-      El::gmp::SetPrecision(parameters.solver.precision);
+      Environment::set_precision(parameters.solver.precision);
+      auto start_time = std::chrono::high_resolution_clock::now();
       if(parameters.verbosity >= Verbosity::regular && El::mpi::Rank() == 0)
         {
-          std::cout << "SDPB started at "
-                    << boost::posix_time::second_clock::local_time() << '\n'
+          // Print command line
+          if(parameters.verbosity >= Verbosity::debug)
+            {
+              std::vector<std::string> arg_list(argv, argv + argc);
+              for(const auto &arg : arg_list)
+                std::cout << arg << " ";
+              std::cout << std::endl;
+            }
+          std::cout << boost::posix_time::second_clock::local_time()
+                    << " Start SDPB" << '\n'
                     << "SDPB version: " << SDPB_VERSION_STRING << '\n'
+                    << "MPI processes: " << El::mpi::Size()
+                    << ", nodes: " << env.num_nodes() << '\n'
                     << parameters << std::endl;
         }
 
-      Block_Info block_info(parameters.sdp_path,
+      if(parameters.verbosity >= Verbosity::debug)
+        {
+          if(env.comm_shared_mem.Rank() == 0)
+            {
+              bool res;
+              auto meminfo = Proc_Meminfo::try_read(res, true);
+              if(res)
+                {
+                  El::Output("node=", env.node_index(), ": MemUsed: ",
+                             pretty_print_bytes(meminfo.mem_used()));
+                }
+            }
+          // Make sure that we don't allocate anything before printing MemUsed
+          El::mpi::Barrier(env.comm_shared_mem);
+        }
+
+      Block_Info block_info(env, parameters.sdp_path,
                             parameters.solver.checkpoint_in,
-                            parameters.procs_per_node,
                             parameters.proc_granularity, parameters.verbosity);
       // Only generate a block_timings file if
       // 1) We are running in parallel
@@ -54,9 +90,8 @@ int main(int argc, char **argv)
           if(parameters.verbosity >= Verbosity::regular
              && El::mpi::Rank() == 0)
             {
-              std::cout << "Performing a timing run, start at "
-                        << boost::posix_time::second_clock::local_time()
-                        << std::endl;
+              El::Output(boost::posix_time::second_clock::local_time(),
+                         " Start timing run");
             }
           SDPB_Parameters timing_parameters(parameters);
           timing_parameters.solver.max_iterations = 2;
@@ -70,24 +105,49 @@ int main(int argc, char **argv)
           timing_parameters.solver.dual_error_threshold = 0;
           timing_parameters.solver.min_primal_step = 0;
           timing_parameters.solver.min_dual_step = 0;
-          if(timing_parameters.verbosity != Verbosity::debug)
+          if(timing_parameters.verbosity < Verbosity::debug)
             {
               timing_parameters.verbosity = Verbosity::none;
             }
-          Timers timers(solve(block_info, timing_parameters));
+          El::Matrix<int32_t> block_timings_ms;
+          Timers timers(solve(block_info, timing_parameters, env, start_time,
+                              block_timings_ms));
 
-          El::Matrix<int32_t> block_timings(block_info.dimensions.size(), 1);
-          write_timing(timing_parameters.solver.checkpoint_out, block_info,
-                       timers, timing_parameters.verbosity >= Verbosity::debug,
-                       block_timings);
+          if(block_timings_ms.Height() == 0 && block_timings_ms.Width() == 0)
+            {
+              RUNTIME_ERROR(
+                "block_timings vector is empty, probably because "
+                "timing run exited before completing two solver iterations.");
+            }
+
+          write_block_timings(timing_parameters.solver.checkpoint_out,
+                              block_info, block_timings_ms,
+                              timing_parameters.verbosity);
+          if(timing_parameters.verbosity >= Verbosity::debug)
+            {
+              try
+                {
+                  write_profiling(parameters.solver.checkpoint_out, timers);
+                }
+              catch(std::exception &e)
+                {
+                  El::Output(
+                    "An exception has been thrown in write_profiling():");
+                  El::ReportException(e);
+                }
+            }
+
           El::mpi::Barrier(El::mpi::COMM_WORLD);
-          Block_Info new_info(
-            parameters.sdp_path, block_timings, parameters.procs_per_node,
-            parameters.proc_granularity, parameters.verbosity);
+          Block_Info new_info(env, parameters.sdp_path, block_timings_ms,
+                              parameters.proc_granularity,
+                              parameters.verbosity);
           std::swap(block_info, new_info);
 
-          parameters.solver.max_runtime
-            -= timers.front().second.elapsed_seconds();
+          auto elapsed_seconds
+            = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::high_resolution_clock::now() - start_time)
+                .count();
+          parameters.solver.max_runtime -= elapsed_seconds;
         }
       else if(!block_info.block_timings_filename.empty()
               && block_info.block_timings_filename
@@ -101,7 +161,21 @@ int main(int argc, char **argv)
                         fs::copy_options::overwrite_existing);
             }
         }
-      solve(block_info, parameters);
+      El::Matrix<int32_t> block_timings_ms;
+      Timers timers(
+        solve(block_info, parameters, env, start_time, block_timings_ms));
+      if(parameters.verbosity >= Verbosity::debug)
+        {
+          try
+            {
+              write_profiling(parameters.solver.checkpoint_out, timers);
+            }
+          catch(std::exception &e)
+            {
+              El::Output("An exception has been thrown in write_profiling():");
+              El::ReportException(e);
+            }
+        }
     }
   catch(std::exception &e)
     {

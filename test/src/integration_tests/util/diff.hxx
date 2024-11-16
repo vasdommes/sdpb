@@ -23,18 +23,30 @@ namespace Test_Util::REQUIRE_Equal
                             const std::vector<std::string> &filenames = {},
                             const std::vector<std::string> &out_txt_keys = {});
 
-  void diff_sdp_zip(const std::filesystem::path &a_sdp_zip,
-                    const std::filesystem::path &b_sdp_zip,
-                    unsigned int input_precision, unsigned int diff_precision,
-                    Test_Case_Runner runner);
+  // Read c,B,y and check that (c - B.y) equals to the vector written to c_minus_By/c_minus_By.json
+  void
+  check_c_minus_By(const std::filesystem::path &sdp_dir,
+                   const std::filesystem::path &sdpb_out_dir,
+                   unsigned int input_precision, unsigned int diff_precision,
+                   const Test_Case_Runner &runner);
+
+  void diff_sdp(const std::filesystem::path &a_sdp,
+                const std::filesystem::path &b_sdp,
+                unsigned int input_precision, unsigned int diff_precision,
+                Test_Case_Runner runner, bool check_normalization = true);
+
+  void diff_functions_json(const std::filesystem::path &a_json,
+                           const std::filesystem::path &b_json,
+                           unsigned int input_precision,
+                           unsigned int diff_precision);
 
   void
   diff_outer_limits(const std::filesystem::path &a_json,
                     const std::filesystem::path &b_json,
                     unsigned int input_precision, unsigned int diff_precision);
 
-  void
-  diff_spectrum(const std::filesystem::path &a_json,
-                const std::filesystem::path &b_json,
-                unsigned int input_precision, unsigned int diff_precision);
+  void diff_spectrum(const std::filesystem::path &a_json,
+                     const std::filesystem::path &b_json,
+                     unsigned int input_precision, unsigned int diff_precision,
+                     bool check_block_path = true);
 }

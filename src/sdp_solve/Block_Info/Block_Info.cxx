@@ -2,34 +2,35 @@
 
 namespace fs = std::filesystem;
 
-Block_Info::Block_Info(const fs::path &sdp_path, const fs::path &checkpoint_in,
-                       const size_t &procs_per_node,
+Block_Info::Block_Info(const Environment &env, const fs::path &sdp_path,
+                       const fs::path &checkpoint_in,
                        const size_t &proc_granularity,
                        const Verbosity &verbosity)
 {
   read_block_info(sdp_path);
   std::vector<Block_Cost> block_costs(
-    read_block_costs(sdp_path, checkpoint_in));
-  allocate_blocks(block_costs, procs_per_node, proc_granularity, verbosity);
+    read_block_costs(sdp_path, checkpoint_in, env));
+  allocate_blocks(env, block_costs, proc_granularity, verbosity);
 }
 
-Block_Info::Block_Info(const fs::path &sdp_path,
+Block_Info::Block_Info(const Environment &env, const fs::path &sdp_path,
                        const El::Matrix<int32_t> &block_timings,
-                       const size_t &procs_per_node,
                        const size_t &proc_granularity,
                        const Verbosity &verbosity)
 {
   read_block_info(sdp_path);
   std::vector<Block_Cost> block_costs;
+  ASSERT_EQUAL(block_timings.Height(), num_points.size());
+  ASSERT_EQUAL(block_timings.Width(), 1);
   for(int64_t block = 0; block < block_timings.Height(); ++block)
     {
       block_costs.emplace_back(block_timings(block, 0), block);
     }
-  allocate_blocks(block_costs, procs_per_node, proc_granularity, verbosity);
+  allocate_blocks(env, block_costs, proc_granularity, verbosity);
 }
 
-Block_Info::Block_Info(const std::vector<size_t> &matrix_dimensions,
-                       const size_t &procs_per_node,
+Block_Info::Block_Info(const Environment &env,
+                       const std::vector<size_t> &matrix_dimensions,
                        const size_t &proc_granularity,
                        const Verbosity &verbosity)
     // TODO: This does not set the filename, file_block_indices, or
@@ -41,7 +42,8 @@ Block_Info::Block_Info(const std::vector<size_t> &matrix_dimensions,
   auto schur_sizes(schur_block_sizes());
   for(size_t block = 0; block < schur_sizes.size(); ++block)
     {
+      // TODO use more precise memory-based estimates, as in read_block_costs()
       block_costs.emplace_back(schur_sizes[block] * schur_sizes[block], block);
     }
-  allocate_blocks(block_costs, procs_per_node, proc_granularity, verbosity);
+  allocate_blocks(env, block_costs, proc_granularity, verbosity);
 }

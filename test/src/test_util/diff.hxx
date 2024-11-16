@@ -1,11 +1,23 @@
 #pragma once
 
+#include "pmp/Damped_Rational.hxx"
+#include "pmp/PVM_Info.hxx"
+
 #include <catch2/catch_amalgamated.hpp>
 #include <El.hpp>
+#include <boost/noncopyable.hpp>
 #include <filesystem>
 
 #define DIFF(a, b)                                                            \
   {                                                                           \
+    INFO("DIFF(" << #a << ", " << #b << ")");                                 \
+    diff(a, b);                                                               \
+  }
+
+// DIFF up to a given binary precision 'prec'
+#define DIFF_PREC(a, b, prec)                                                 \
+  {                                                                           \
+    Test_Util::REQUIRE_Equal::Diff_Precision p(prec);                         \
     INFO("DIFF(" << #a << ", " << #b << ")");                                 \
     diff(a, b);                                                               \
   }
@@ -17,8 +29,26 @@ namespace Test_Util::REQUIRE_Equal
 {
   inline int diff_precision;
 
-  inline void diff(int a, int b) { REQUIRE(a == b); }
-  inline void diff(const El::BigFloat &a, const El::BigFloat &b)
+  // RAII wrapper allowing to set diff_precision temporarily
+  struct Diff_Precision : boost::noncopyable
+  {
+    explicit Diff_Precision(int precision)
+    {
+      old_precision = diff_precision;
+      diff_precision = precision;
+    }
+    virtual ~Diff_Precision() { diff_precision = old_precision; }
+
+  private:
+    int old_precision;
+  };
+
+  template <class T> void diff(const T &a, const T &b)
+  {
+    REQUIRE(a == b);
+  }
+
+  template <> inline void diff(const El::BigFloat &a, const El::BigFloat &b)
   {
     if(a == b)
       return;
@@ -45,19 +75,15 @@ namespace Test_Util::REQUIRE_Equal
     CAPTURE(eps);
     REQUIRE(Abs(a - b) < eps * (Abs(a) + Abs(b)));
   }
-  inline void diff(const std::string &a, const std::string &b)
-  {
-    REQUIRE(a == b);
-  }
   template <class T1, class T2>
-  inline void diff(const std::pair<T1, T2> &a, const std::pair<T1, T2> &b)
+  void diff(const std::pair<T1, T2> &a, const std::pair<T1, T2> &b)
   {
     INFO("diff std::pair");
     DIFF(a.first, b.first);
     DIFF(a.second, b.second);
   }
   template <class T>
-  inline void diff(const std::vector<T> &a, const std::vector<T> &b)
+  void diff(const std::vector<T> &a, const std::vector<T> &b)
   {
     INFO("diff std::vector");
     REQUIRE(a.size() == b.size());
@@ -67,8 +93,7 @@ namespace Test_Util::REQUIRE_Equal
         DIFF(a[i], b[i]);
       }
   }
-  template <class T>
-  inline void diff(const El::Matrix<T> &a, const El::Matrix<T> &b)
+  template <class T> void diff(const El::Matrix<T> &a, const El::Matrix<T> &b)
   {
     INFO("diff El::Matrix");
     REQUIRE(a.Height() == b.Height());
@@ -80,5 +105,65 @@ namespace Test_Util::REQUIRE_Equal
           CAPTURE(col);
           DIFF(a.Get(row, col), b.Get(row, col));
         }
+  }
+  template <class T>
+  void diff(const El::DistMatrix<T> &a, const El::DistMatrix<T> &b,
+            const std::optional<El::UpperOrLower> uplo = std::nullopt)
+  {
+    INFO("diff El::DistMatrix");
+    CAPTURE(uplo);
+    REQUIRE(a.Height() == b.Height());
+    REQUIRE(a.Width() == b.Width());
+    REQUIRE(a.Grid() == b.Grid());
+
+    // only square matrices allowed for uplo
+    if(uplo.has_value())
+      REQUIRE(a.Height() == a.Width());
+
+    for(int iLoc = 0; iLoc < a.LocalHeight(); ++iLoc)
+      for(int jLoc = 0; jLoc < a.LocalWidth(); ++jLoc)
+        {
+          CAPTURE(iLoc);
+          CAPTURE(jLoc);
+          int i = a.GlobalRow(iLoc);
+          int j = a.GlobalCol(jLoc);
+          CAPTURE(i);
+          CAPTURE(j);
+          if(uplo.has_value())
+            {
+              if(uplo.value() == El::UPPER && i > j)
+                continue;
+              if(uplo.value() == El::LOWER && i < j)
+                continue;
+            }
+
+          DIFF(a.GetLocal(iLoc, jLoc), b.GetLocal(iLoc, jLoc));
+        }
+  }
+  template <>
+  inline void
+  diff(const std::filesystem::path &a, const std::filesystem::path &b)
+  {
+    CAPTURE(a);
+    CAPTURE(b);
+    DIFF(weakly_canonical(a).string(), weakly_canonical(b).string());
+  }
+  template <>
+  inline void diff(const Damped_Rational &a, const Damped_Rational &b)
+  {
+    INFO("diff Damped_Rational");
+    DIFF(a.base, b.base);
+    DIFF(a.constant, b.constant);
+    DIFF(a.poles, b.poles);
+  }
+  template <> inline void diff(const PVM_Info &a, const PVM_Info &b)
+  {
+    // Ignore path
+    // DIFF(a.block_path,b.block_path);
+    DIFF(a.prefactor, b.prefactor);
+    DIFF(a.reduced_prefactor, b.reduced_prefactor);
+    DIFF(a.sample_points, b.sample_points);
+    DIFF(a.sample_scalings, b.sample_scalings);
+    DIFF(a.reduced_sample_scalings, b.reduced_sample_scalings);
   }
 }

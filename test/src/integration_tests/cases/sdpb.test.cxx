@@ -7,9 +7,9 @@ TEST_CASE("sdpb")
 {
   INFO("SDPB tests for a simple one-dimensional problem:");
   INFO("maximize (-y) s.t. (1 + x^4 + y * (x^4 / 12 + x^2)) >= 0)");
-  auto data_dir = Test_Config::test_data_dir / "sdpb";
   // default sdp input file
-  auto sdp_path = Test_Config::test_data_dir / "sdp.zip";
+  auto sdp_path = Test_Config::test_data_dir / "end-to-end_tests" / "1d"
+                  / "output" / "sdp";
   CAPTURE(sdp_path);
 
   int num_procs = 2;
@@ -28,6 +28,9 @@ TEST_CASE("sdpb")
          const std::string &required_error_msg = "") -> void {
     args["--checkpointDir"] = (runner.output_dir / "ck").string();
     args["--outDir"] = (runner.output_dir / "out").string();
+    // We removed obsolete --procsPerNode from end-to-end.test.cxx,
+    // but we keep it here to check backward compatibility,
+    // i.e. SDPB shouldn't fail when we pass this option.
     args["--procsPerNode"] = std::to_string(num_procs);
     runner.mpi_run({"build/sdpb"}, args, num_procs, required_exit_code,
                    required_error_msg);
@@ -35,36 +38,50 @@ TEST_CASE("sdpb")
 
   // create file with readonly premissions
   auto create_readonly = [](const fs::path &path) {
-    create_directories(path.parent_path());
+    if(path.has_parent_path())
+      create_directories(path.parent_path());
     std::ofstream os(path);
     os << "";
     fs::permissions(path, fs::perms::others_read);
   };
-
-  SECTION("sdpb")
-  {
-    INFO("Single-process sdpb run");
-    Test_Util::Test_Case_Runner runner("sdpb");
-    auto args = default_args;
-    run_sdpb_set_out_ck_dirs(runner.create_nested("run"), args, 1);
-    Test_Util::REQUIRE_Equal::diff_sdpb_output_dir(
-      args["--outDir"], data_dir / "test_out_orig", 1024, 1024);
-  }
 
   SECTION("io_tests")
   {
     INFO("Check that sdpb fails on different IO errors.");
     SECTION("write_profile")
     {
-      Test_Util::Test_Case_Runner runner("sdpb/io_tests/write_profile");
-      auto args = default_args;
-      args["--maxIterations"] = "1";
-      args["--verbosity"] = "2";
+      int max_iterations = GENERATE(1, 2);
+      DYNAMIC_SECTION("--maxIterations=" << max_iterations)
+      {
+        Test_Util::Test_Case_Runner runner(
+          "sdpb/io_tests/write_profile/--maxIterations="
+          + std::to_string(max_iterations));
+        auto args = default_args;
+        args["--maxIterations"] = std::to_string(max_iterations);
+        args["--verbosity"] = "2";
 
-      create_readonly(runner.output_dir / "ck.profiling/profiling.0");
-      run_sdpb_set_out_ck_dirs(runner, args, num_procs, 1,
-                               "Error when writing to");
-      REQUIRE(fs::file_size(runner.output_dir / "ck.profiling/profiling.1") > 0);
+        create_readonly(runner.output_dir / "ck.profiling/profiling.0");
+        run_sdpb_set_out_ck_dirs(runner, args, num_procs);
+
+        {
+          INFO(
+            "ck.profiling/ exists, SDPB should rename it to ck.profiling.0/");
+          INFO("Then SDPB should create "
+               "ck.profiling.1/profiling.* for timing run and "
+               "ck.profiling/profiling.* for actual run.");
+          for(const std::string dir_suffix : {"", ".1"})
+            for(const size_t rank : {0, 1})
+              {
+                auto profiling_path = runner.output_dir
+                                      / ("ck.profiling" + dir_suffix)
+                                      / ("profiling." + std::to_string(rank));
+                REQUIRE(fs::file_size(profiling_path) > 0);
+              }
+        }
+        {
+          REQUIRE(fs::file_size(runner.output_dir / "ck/block_timings") > 0);
+        }
+      }
     }
 
     for(std::string name :
@@ -90,7 +107,6 @@ TEST_CASE("sdpb")
       Test_Util::Test_Case_Runner runner("sdpb/io_tests/input_corruption");
       auto sdp_corrupted = runner.output_dir / "sdp_corrupted.zip";
       fs::create_directories(runner.output_dir);
-      fs::copy(sdp_path, sdp_corrupted, fs::copy_options::recursive);
       std::ofstream os(sdp_corrupted);
       os << "any bytes to corrupt zip archive";
 

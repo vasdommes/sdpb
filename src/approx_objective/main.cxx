@@ -1,15 +1,15 @@
-#include "Approx_Parameters.hxx"
 #include "Approx_Objective.hxx"
-#include "../sdp_solve.hxx"
-
-#include "../set_stream_precision.hxx"
+#include "Approx_Parameters.hxx"
+#include "sdp_solve/sdp_solve.hxx"
+#include "sdpb_util/ostream/set_stream_precision.hxx"
 
 #include <El.hpp>
 
 namespace fs = std::filesystem;
 
-void setup_solver(const Block_Info &block_info, const El::Grid &grid,
-                  const SDP &sdp, const fs::path &solution_dir,
+void setup_solver(const Environment &env, const Block_Info &block_info,
+                  const El::Grid &grid, const SDP &sdp,
+                  const Approx_Parameters &parameters,
                   Block_Diagonal_Matrix &schur_complement_cholesky,
                   Block_Matrix &schur_off_diagonal,
                   El::DistMatrix<El::BigFloat> &Q);
@@ -36,7 +36,7 @@ quadratic_approximate_objectives(
 
 int main(int argc, char **argv)
 {
-  El::Environment env(argc, argv);
+  Environment env(argc, argv);
 
   try
     {
@@ -45,13 +45,24 @@ int main(int argc, char **argv)
         {
           return 0;
         }
-      El::gmp::SetPrecision(parameters.precision);
-      Block_Info block_info(parameters.sdp_path, parameters.solution_dir,
-                            parameters.procs_per_node,
-                            parameters.proc_granularity, Verbosity::none);
+
+      // Print command line
+      if(parameters.verbosity >= Verbosity::debug && El::mpi::Rank() == 0)
+        {
+          std::vector<std::string> arg_list(argv, argv + argc);
+          for(const auto &arg : arg_list)
+            std::cout << arg << " ";
+          std::cout << std::endl;
+        }
+
+      Environment::set_precision(parameters.precision);
+      Block_Info block_info(env, parameters.sdp_path, parameters.solution_dir,
+                            parameters.proc_granularity, parameters.verbosity);
 
       El::Grid grid(block_info.mpi_comm.value);
-      SDP sdp(parameters.sdp_path, block_info, grid);
+      // TODO use timers also below
+      Timers timers(env, parameters.verbosity);
+      SDP sdp(parameters.sdp_path, block_info, grid, timers);
 
       std::vector<size_t> block_offsets(sdp.free_var_matrix.blocks.size() + 1,
                                         0);
@@ -93,7 +104,7 @@ int main(int argc, char **argv)
           El::DistMatrix<El::BigFloat> Q(sdp.dual_objective_b.Height(),
                                          sdp.dual_objective_b.Height());
 
-          setup_solver(block_info, grid, sdp, parameters.solution_dir,
+          setup_solver(env, block_info, grid, sdp, parameters,
                        schur_complement_cholesky, schur_off_diagonal, Q);
           if(parameters.write_solver_state)
             {

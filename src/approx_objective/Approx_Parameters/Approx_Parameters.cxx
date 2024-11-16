@@ -1,5 +1,8 @@
 #include "../Approx_Parameters.hxx"
 
+#include "sdp_solve/Solver_Parameters/String_To_Bytes_Translator.hxx"
+#include "sdpb_util/assert.hxx"
+
 #include <boost/program_options.hpp>
 
 namespace fs = std::filesystem;
@@ -15,17 +18,6 @@ Approx_Parameters::Approx_Parameters(int argc, char *argv[])
     "sdp", po::value<fs::path>(&sdp_path)->required(),
     "File or directory containing preprocessed SDP input corresponding to the "
     "solution.");
-  required_options.add_options()(
-    "procsPerNode", po::value<size_t>(&procs_per_node)->required(),
-    "The number of processes that can run on a node.  When running on "
-    "more "
-    "than one node, the load balancer needs to know how many processes "
-    "are assigned to each node.  On a laptop or desktop, this would be "
-    "the number of physical cores on your machine, not including "
-    "hyperthreaded cores.  For current laptops (2018), this is probably "
-    "2 or 4.\n\n"
-    "If you are using the Slurm workload manager, this should be set to "
-    "'$SLURM_NTASKS_PER_NODE'.");
   required_options.add_options()(
     "precision", boost::program_options::value<size_t>(&precision)->required(),
     "The precision, in the number of bits, for numbers in the "
@@ -49,13 +41,17 @@ Approx_Parameters::Approx_Parameters(int argc, char *argv[])
     "A file containing either preprocessed input for the SDP you wish to "
     "approximate, or a null separated list of files with preprocessed input.");
   basic_options.add_options()(
-    "procGranularity", po::value<size_t>(&proc_granularity)->default_value(1),
-    "procGranularity must evenly divide procsPerNode.\n\n"
-    "The minimum number of cores in a group, used during load balancing.  "
-    "Setting it to anything larger than 1 will make the solution take "
-    "longer.  "
-    "This option is generally useful only when trying to fit a large problem "
-    "in a small machine.");
+    "maxSharedMemory",
+    boost::program_options::value<std::string>()
+      ->notifier([this](const std::string &s) {
+        this->max_shared_memory_bytes
+          = String_To_Bytes_Translator::from_string(s);
+      })
+      ->default_value("0"),
+    "Maximum amount of memory that can be used for MPI shared windows, "
+    "in bytes."
+    " Optional suffixes: B (bytes), K or KB (kilobytes), M or MB (megabytes), "
+    "G or GB (gigabytes).");
   basic_options.add_options()(
     "solutionDir", boost::program_options::value<fs::path>(&solution_dir),
     "The directory with the text format solutions of x and y for the primary "
@@ -68,12 +64,31 @@ Approx_Parameters::Approx_Parameters(int argc, char *argv[])
     "approx_objective to skip the time consuming part of setting up the "
     "solver.");
   basic_options.add_options()(
-    "linear",
-    po::bool_switch(&linear_only)->default_value(false),
+    "linear", po::bool_switch(&linear_only)->default_value(false),
     "Only compute the linear correction, not the quadratic correction.  "
     "This avoids having to compute an expensive inverse.");
+  basic_options.add_options()(
+    "verbosity",
+    po::value<Verbosity>(&verbosity)->default_value(Verbosity::regular),
+    "Verbosity.  0 -> no output, 1 -> regular output, 2 -> debug output, 3 -> "
+    "trace output");
 
   cmd_line_options.add(basic_options);
+
+  po::options_description obsolete_options("Obsolete options");
+  obsolete_options.add_options()(
+    "procsPerNode", po::value<size_t>(),
+    "[OBSOLETE] The number of MPI processes running on a node. "
+    "Determined automatically from MPI environment.");
+  obsolete_options.add_options()(
+    "procGranularity", po::value<size_t>(&proc_granularity),
+    "[OBSOLETE] procGranularity must evenly divide number of processes per "
+    "node.\n\n"
+    "The minimum number of cores in a group, used during load balancing.  "
+    "Setting it to anything larger than 1 will make the solution take "
+    "longer.  "
+    "This option should not be used except for testing purposes.");
+  cmd_line_options.add(obsolete_options);
 
   po::variables_map variables_map;
   try
@@ -94,29 +109,16 @@ Approx_Parameters::Approx_Parameters(int argc, char *argv[])
             {
               param_path = variables_map["paramFile"].as<fs::path>();
               std::ifstream ifs(param_path);
-              if(!ifs.good())
-                {
-                  throw std::runtime_error("Could not open '"
-                                           + param_path.string() + "'");
-                }
-
+              ASSERT(ifs.good(), "Could not open ", param_path);
               po::store(po::parse_config_file(ifs, cmd_line_options),
                         variables_map);
             }
 
           po::notify(variables_map);
 
-          if(!fs::exists(sdp_path))
-            {
-              throw std::runtime_error("SDP path '" + sdp_path.string()
-                                       + "' does not exist");
-            }
-
-          if(!new_sdp_path.empty() && !fs::exists(new_sdp_path))
-            {
-              throw std::runtime_error("New SDP path '" + new_sdp_path.string()
-                                       + "' does not exist");
-            }
+          ASSERT(fs::exists(sdp_path), "SDP path does not exist: ", sdp_path);
+          ASSERT(new_sdp_path.empty() || fs::exists(new_sdp_path),
+                 "New SDP path does not exist: ", sdp_path);
 
           if(variables_map.count("solutionDir") == 0)
             {
@@ -126,6 +128,25 @@ Approx_Parameters::Approx_Parameters(int argc, char *argv[])
                   solution_dir = solution_dir.parent_path();
                 }
               solution_dir += "_out";
+            }
+
+          if(El::mpi::Rank() == 0)
+            {
+              if(variables_map.count("procsPerNode") != 0)
+                {
+                  PRINT_WARNING(
+                    "--procsPerNode option is obsolete. The number of "
+                    "MPI processes running on a node is determined "
+                    "automatically from MPI environment.");
+                }
+              if(variables_map.count("procGranularity") != 0)
+                {
+                  PRINT_WARNING("--procGranularity option is obsolete. "
+                                "Setting it to anything larger than 1 will "
+                                "make the solution take longer. "
+                                "This option should not be used except for "
+                                "testing purposes.");
+                }
             }
         }
     }

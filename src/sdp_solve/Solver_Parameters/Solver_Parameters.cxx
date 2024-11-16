@@ -1,5 +1,7 @@
 #include "../Solver_Parameters.hxx"
 
+#include "String_To_Bytes_Translator.hxx"
+
 #include <boost/program_options.hpp>
 
 namespace fs = std::filesystem;
@@ -19,7 +21,7 @@ boost::program_options::options_description Solver_Parameters::options()
     "The precision, in the number of bits, for numbers in the "
     "computation. "
     " This should be less than or equal to the precision used when "
-    "preprocessing the XML input files with 'pvm2sdp'.  GMP will round "
+    "preprocessing the input PMP files with 'pmp2sdp'.  GMP will round "
     "this up to a multiple of 32 or 64, depending on the system.");
   result.add_options()(
     "findPrimalFeasible",
@@ -55,6 +57,18 @@ boost::program_options::options_description Solver_Parameters::options()
                        boost::program_options::value<int64_t>(&max_runtime)
                          ->default_value(std::numeric_limits<int64_t>::max()),
                        "Maximum amount of time to run the solver in seconds.");
+  result.add_options()(
+    "maxSharedMemory",
+    boost::program_options::value<std::string>()
+      ->notifier([this](const std::string &s) {
+        this->max_shared_memory_bytes
+          = String_To_Bytes_Translator::from_string(s);
+      })
+      ->default_value("0"),
+    "Maximum amount of memory that can be used for MPI shared windows, "
+    "in bytes."
+    " Optional suffixes: B (bytes), K or KB (kilobytes), M or MB (megabytes), "
+    "G or GB (gigabytes).");
   result.add_options()(
     "dualityGapThreshold",
     boost::program_options::value<El::BigFloat>(&duality_gap_threshold)
@@ -128,11 +142,10 @@ boost::program_options::options_description Solver_Parameters::options()
     "Checkpoints are saved to this directory every checkpointInterval.  Set "
     "to the empty string to inhibit checkpoints.  Defaults to sdpDir with "
     "'.ck' extension.");
-  result.add_options()(
-    "initialCheckpointDir,i",
+  result.add_options()("initialCheckpointDir,i",
                        boost::program_options::value<fs::path>(&checkpoint_in),
                        "The initial checkpoint directory to load. Defaults to "
-    "checkpointDir.");
+                       "checkpointDir.");
   result.add_options()(
     "checkpointInterval",
     boost::program_options::value<int64_t>(&checkpoint_interval)

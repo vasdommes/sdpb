@@ -21,10 +21,16 @@
 #
 # Note: 'mpirun --oversubscribe' is necessary only if your environment has less than 6 CPUs available
 
-# latest alpine release
-FROM alpine:3.18 AS build
+# Elemental binaries built from https://gitlab.com/bootstrapcollaboration/elemental.git
+# based on the same alpine:3.18 build as below
+
+# Built from https://github.com/vasdommes/flint/tree/docker-main
+FROM vasdommes/flint:main as flint
+
+FROM bootstrapcollaboration/elemental:master AS build
 
 RUN apk add \
+    binutils \
     cmake \
     g++ \
     git \
@@ -40,25 +46,27 @@ RUN apk add \
     openmpi \
     openmpi-dev \
     rapidjson-dev
-WORKDIR /usr/local/src
-# Build Elemental
-RUN git clone https://gitlab.com/bootstrapcollaboration/elemental.git && \
-    cd elemental && \
-    mkdir -p build && \
-    cd build && \
-    cmake .. -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_C_COMPILER=mpicc -DCMAKE_INSTALL_PREFIX=/usr/local/ && \
-    make && \
-    make install
-# Build SDPB from current sources
-COPY . sdpb
-RUN cd sdpb && \
-    ./waf configure --elemental-dir=/usr/local --prefix=/usr/local && \
+WORKDIR /usr/local/src/sdpb
+# Include FLINT
+COPY --from=flint /usr/local /usr/local
+COPY --from=flint /usr/local/lib /usr/local/lib
+COPY --from=flint /usr/local/include /usr/local/include
+# Build SDPB from current sources, print build/config.log in configuration failed
+COPY . .
+RUN (./waf configure --elemental-dir=/usr/local --flint-dir=/usr/local --prefix=/usr/local \
+        || (cat build/config.log && exit 1) \
+    ) && \
     python3 ./waf && \
     python3 ./waf install
 
 # Take only sdpb binaries + load necessary dynamic libraries
-FROM alpine:3.18 as install
+# Unfortunately, boost1.82-stacktrace_addr2line does not exist as a standalone package in Alpine Linux repo.
+# Thus we have to load the whole boost-dev (~180MB extra)
+# TODO: for some reason, function names and source locations are not printed in stacktrace.
+FROM alpine:3.19 as install
 RUN apk add \
+    binutils \
+    boost-dev \
     boost1.82-date_time \
     boost1.82-filesystem \
     boost1.82-iostreams \
