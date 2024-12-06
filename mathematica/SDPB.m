@@ -29,7 +29,17 @@ evalDampedRationalRegulated[DampedRational[c_,poles_,b_,x],x0_,minPoleDistance_]
 evalDampedRationalRegulated[const_?NumericQ,x0_,minPoleDistance_]:=const;
 
 nf[x_Integer, prec___] := x;
-nf[x_, prec_:prec] := NumberForm[SetPrecision[x,prec],prec,ExponentFunction->(Null&)];
+nf[x_, prec_:prec] := NumberForm[
+  (*InputForm is required to put expressions like 1/(x+1) to a single line*)
+  InputForm[
+    (*Truncate zeros from integer numbers.
+      TODO: truncate other zeros, see https://mathematica.stackexchange.com/questions/179486/suppress-trailing-0s-in-numerical-values *)
+    SetPrecision[x,prec]/.{(number_Real/;Round[number]==number)->Round[number]}
+    ,NumberMarks->False
+  ]
+  (*Disable scientific notation*)
+  ,ScientificNotationThreshold->{-Infinity,Infinity}
+  ];
 nf[x_] := nf[x ,prec];
 
 safeCoefficientList[p_, x_] := Module[
@@ -60,6 +70,16 @@ toJsonObject[value_?MissingQ, args___]:=value;
 bilinearBasisToJson[value_?MissingQ,args___]:=value;
 bilinearBasisToJson[value_List,prec_]:=toJsonNumberArray[safeCoefficientList[#, x],prec]&/@value;
 
+(*If polynomial is represeted by some non-numeric epression, e.g. FS[“FSvvvv”,0,1,0,-1],
+*)
+polynomialToJson[poly_, prec_]:=Module[
+  {coeffs=safeCoefficientList[poly, x]},
+  If[Length[coeffs]==1 && Not@NumericQ@coeffs[[1]],
+    nf[coeffs[[1]], prec],
+    toJsonNumberArray[coeffs, prec]
+  ]
+  ];
+
 toJsonDampedRational[DampedRational[constant_, poles_List, base_, x],prec_] := <|
    "base" -> toJsonNumber[base,prec],
    "constant" -> toJsonNumber[constant,prec],
@@ -82,7 +102,7 @@ Module[
 <|
   "prefactor" -> toJsonDampedRational[pmp[["prefactor"]],prec],
   "reducedPrefactor" -> toJsonDampedRational[pmp[["reducedPrefactor"]],prec],
-  "polynomials" -> Map[toJsonNumberArray[safeCoefficientList[#, x],prec] &, pmp[["polynomials"]], {3}],
+  "polynomials" -> Map[polynomialToJson[#,prec] &, pmp[["polynomials"]], {3}],
   "samplePoints" -> toJsonNumberArray[sampleData[["samplePoints"]],prec],
   "sampleScalings" -> toJsonNumberArray[sampleData[["sampleScalings"]],prec],
   "reducedSampleScalings" -> toJsonNumberArray[sampleData[["reducedSampleScalings"]],prec],
