@@ -8,6 +8,7 @@
 using Vector_Of_Polynomial_Vectors = std::vector<Polynomial_Vector>;
 using Matrix_Of_Polynomial_Vectors = std::vector<Vector_Of_Polynomial_Vectors>;
 
+template <template <class TFloat> class TJson_Float_Parser>
 class Json_Positive_Matrix_With_Prefactor_Parser final
     : public Abstract_Json_Object_Parser<Polynomial_Vector_Matrix>
 {
@@ -60,11 +61,14 @@ public:
   {}
 
 private:
-  using BigFloat_Vector_Parser = Json_Vector_Parser<Json_BigFloat_Parser>;
+  using BigFloat_Parser = TJson_Float_Parser<El::BigFloat>;
+  using Boost_Float_Parser = TJson_Float_Parser<Boost_Float>;
+
+  using BigFloat_Vector_Parser = Json_Vector_Parser<BigFloat_Parser>;
   using Damped_Rational_Parser
-    = Json_Damped_Rational_Parser;
+    = Json_Damped_Rational_Parser<Boost_Float_Parser>;
   using Polynomial_Vector_Parser
-    = Json_Vector_Parser<Json_Polynomial_Parser>;
+    = Json_Vector_Parser<Json_Polynomial_Parser<BigFloat_Parser>>;
   using Vector_Of_Polynomial_Vectors_Parser
     = Json_Vector_Parser<Polynomial_Vector_Parser>;
   // Matrix = Vector of Vectors <Polynomial_Vector>

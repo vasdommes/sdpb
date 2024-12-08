@@ -20,13 +20,14 @@
 //     }
 //   }
 // },
+template <class TJson_Boost_Float_Parser>
 class Json_Damped_Rational_Parser final
     : public Abstract_Json_Object_Parser<Damped_Rational>
 {
 private:
   Damped_Rational result;
 
-  using Float_Parser = Json_Boost_Float_Parser;
+  using Float_Parser = TJson_Boost_Float_Parser;
 
   Float_Parser base_parser;
   Float_Parser constant_parser;

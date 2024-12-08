@@ -4,8 +4,9 @@
 #include "sdpb_util/json/Json_Vector_Parser.hxx"
 #include "pmp/Polynomial.hxx"
 
+template <class TJson_BigFloat_Parser>
 class Json_Polynomial_Parser final
-    : public Abstract_Json_Vector_Parser<Polynomial, Json_BigFloat_Parser>
+    : public Abstract_Json_Vector_Parser<Polynomial, TJson_BigFloat_Parser>
 {
   Polynomial result{0, 0};
 
@@ -16,7 +17,8 @@ public:
   Json_Polynomial_Parser(
     const bool skip, const std::function<void(Polynomial &&)> &on_parsed,
     const std::function<void()> &on_skipped = [] {})
-      : Abstract_Json_Vector_Parser(skip, on_parsed, on_skipped)
+      : Abstract_Json_Vector_Parser<Polynomial, TJson_BigFloat_Parser>(
+          skip, on_parsed, on_skipped)
   {}
 
   void clear_result() override { result.coefficients.clear(); }

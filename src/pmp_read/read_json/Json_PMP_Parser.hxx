@@ -13,10 +13,14 @@ class Json_PMP_Parser final
   using Ch = rapidjson::UTF8<>::Ch;
 
 private:
-  using BigFloat_Vector_Parser = Json_Vector_Parser<Json_BigFloat_Parser>;
+  template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
+
+  using BigFloat_Vector_Parser
+    = Json_Vector_Parser<Float_Parser<El::BigFloat>>;
 
   using Json_Positive_Matrix_With_Prefactor_Array_Parser
-    = Json_Vector_Parser_With_Skip<Json_Positive_Matrix_With_Prefactor_Parser>;
+    = Json_Vector_Parser_With_Skip<
+      Json_Positive_Matrix_With_Prefactor_Parser<Float_Parser>>;
 
   PMP_File_Parse_Result result;
 

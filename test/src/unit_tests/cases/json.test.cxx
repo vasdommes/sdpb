@@ -139,7 +139,7 @@ namespace
     };
     const bool skip = false;
 
-    Json_Polynomial_Parser parser(skip, on_parsed);
+    Json_Polynomial_Parser<Json_BigFloat_Parser> parser(skip, on_parsed);
 
     json_parse(json_string, parser);
     return output;
