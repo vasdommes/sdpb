@@ -6,15 +6,20 @@ Json_PMP_Parser::Json_PMP_Parser(
   const std::function<bool(size_t matrix_index)> &should_parse_matrix,
   const std::function<void(value_type &&result)> &on_parsed)
     : Abstract_Json_Object_Parser(false, on_parsed, [] {}),
-      objective_parser(!should_parse_objective,
-                       [this](std::vector<El::BigFloat> &&result) {
-                         this->result.objective = std::move(result);
-                       }),
-      normalization_parser(!should_parse_normalization,
-                           // accept normalization vector:
-                           [this](std::vector<El::BigFloat> &&result) {
-                             this->result.normalization = std::move(result);
-                           }),
+      context(std::make_shared<PMP_Parsing_Context>()),
+      objective_parser(
+        !should_parse_objective,
+        [this](std::vector<El::BigFloat> &&result) {
+          this->result.objective = std::move(result);
+        },
+        [] {}, context),
+      normalization_parser(
+        !should_parse_normalization,
+        // accept normalization vector:
+        [this](std::vector<El::BigFloat> &&result) {
+          this->result.normalization = std::move(result);
+        },
+        [] {}, context),
       matrices_parser(
         // don't skip matrices array:
         false,
@@ -36,7 +41,8 @@ Json_PMP_Parser::Json_PMP_Parser(
         // Skip some matrices according to their indices:
         [&should_parse_matrix](size_t index) {
           return !should_parse_matrix(index);
-        })
+        },
+        context)
 {}
 Abstract_Json_Reader_Handler &
 Json_PMP_Parser::element_parser(const std::string &key)

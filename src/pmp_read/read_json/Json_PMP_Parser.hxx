@@ -6,6 +6,28 @@
 #include "sdpb_util/json/Json_Float_Parser.hxx"
 #include "sdpb_util/json/Json_Vector_Parser_With_Skip.hxx"
 
+struct PMP_Parsing_Context
+{};
+
+template <class TFloat>
+class Json_Mathematica_Float_Parser final
+    : public Json_String_Element_Parser<TFloat>
+{
+public:
+  using value_type = TFloat;
+
+  Json_Mathematica_Float_Parser(
+    bool skip, const std::function<void(value_type &&)> &on_parsed,
+    const std::function<void()> &on_skipped,
+    const std::shared_ptr<PMP_Parsing_Context> &context)
+      : Json_String_Element_Parser<TFloat>(skip, on_parsed, on_skipped),
+        context(context)
+  {}
+
+private:
+  std::shared_ptr<PMP_Parsing_Context> context;
+};
+
 class Json_PMP_Parser final
     : public Abstract_Json_Object_Parser<PMP_File_Parse_Result>
 {
@@ -13,7 +35,9 @@ class Json_PMP_Parser final
   using Ch = rapidjson::UTF8<>::Ch;
 
 private:
-  template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
+  // template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
+  template <class TFloat>
+  using Float_Parser = Json_Mathematica_Float_Parser<TFloat>;
 
   using BigFloat_Vector_Parser
     = Json_Vector_Parser<Float_Parser<El::BigFloat>>;
@@ -21,6 +45,8 @@ private:
   using Json_Positive_Matrix_With_Prefactor_Array_Parser
     = Json_Vector_Parser_With_Skip<
       Json_Positive_Matrix_With_Prefactor_Parser<Float_Parser>>;
+
+  std::shared_ptr<PMP_Parsing_Context> context;
 
   PMP_File_Parse_Result result;
 

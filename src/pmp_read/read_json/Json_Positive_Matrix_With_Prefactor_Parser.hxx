@@ -35,9 +35,7 @@ public:
     [] {}, std::forward<TArgs>(float_parser_args)...)
 
         ELEMENT_PARSER_CTOR(polynomials),
-        prefactor_parser(
-          skip, [this](auto &&value) { this->prefactor = std::move(value); },
-          [] {}, float_parser_args...),
+        ELEMENT_PARSER_CTOR(prefactor),
         ELEMENT_PARSER_CTOR(reduced_prefactor),
         ELEMENT_PARSER_CTOR(sample_points),
         ELEMENT_PARSER_CTOR(sample_scalings),
