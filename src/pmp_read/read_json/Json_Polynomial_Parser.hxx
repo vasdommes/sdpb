@@ -14,11 +14,14 @@ public:
   using element_type = El::BigFloat;
   using value_type = Polynomial;
 
+  template <class... TArgs>
   Json_Polynomial_Parser(
     const bool skip, const std::function<void(Polynomial &&)> &on_parsed,
-    const std::function<void()> &on_skipped = [] {})
+    const std::function<void()> &on_skipped = [] {},
+    TArgs &&...bigfloat_parser_args)
       : Abstract_Json_Vector_Parser<Polynomial, TJson_BigFloat_Parser>(
-          skip, on_parsed, on_skipped)
+          skip, on_parsed, on_skipped,
+          std::forward<TArgs>(bigfloat_parser_args)...)
   {}
 
   void clear_result() override { result.coefficients.clear(); }

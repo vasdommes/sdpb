@@ -34,21 +34,30 @@ private:
   Json_Vector_Parser<Float_Parser> poles_parser;
 
 public:
+  template <class... TArgs>
   Json_Damped_Rational_Parser(
     const bool skip, const std::function<void(Damped_Rational &&)> &on_parsed,
-    const std::function<void()> &on_skipped = [] {})
+    const std::function<void()> &on_skipped = [] {},
+    TArgs &&...float_parser_args)
       : Abstract_Json_Object_Parser(skip, on_parsed, on_skipped),
-        base_parser(skip,
-                    [this](Boost_Float &&value) {
-                      this->result.base = std::move(value);
-                    }),
-        constant_parser(skip,
-                        [this](Boost_Float &&value) {
-                          this->result.constant = std::move(value);
-                        }),
-        poles_parser(skip, [this](std::vector<Boost_Float> &&value) {
-          this->result.poles = std::move(value);
-        })
+        base_parser(
+          skip,
+          [this](Boost_Float &&value) {
+            this->result.base = std::move(value);
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...),
+        constant_parser(
+          skip,
+          [this](Boost_Float &&value) {
+            this->result.constant = std::move(value);
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...),
+        poles_parser(
+          skip,
+          [this](std::vector<Boost_Float> &&value) {
+            this->result.poles = std::move(value);
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...)
   {}
 
 protected:

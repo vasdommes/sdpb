@@ -22,18 +22,22 @@ private:
   std::optional<std::array<Polynomial_Vector, 2>> bilinear_basis;
 
 public:
+  template <class... TArgs>
   Json_Positive_Matrix_With_Prefactor_Parser(
     const bool skip,
     const std::function<void(Polynomial_Vector_Matrix &&)> &on_parsed,
-    const std::function<void()> &on_skipped)
+    const std::function<void()> &on_skipped, TArgs&&... float_parser_args)
       : Abstract_Json_Object_Parser(skip, on_parsed, on_skipped),
 
 #define ELEMENT_PARSER_CTOR(element_name)                                     \
   element_name##_parser(                                                      \
-    skip, [this](auto &&value) { this->element_name = std::move(value); })
+    skip, [this](auto &&value) { this->element_name = std::move(value); },    \
+    [] {}, std::forward<TArgs>(float_parser_args)...)
 
         ELEMENT_PARSER_CTOR(polynomials),
-        ELEMENT_PARSER_CTOR(prefactor),
+        prefactor_parser(
+          skip, [this](auto &&value) { this->prefactor = std::move(value); },
+          [] {}, float_parser_args...),
         ELEMENT_PARSER_CTOR(reduced_prefactor),
         ELEMENT_PARSER_CTOR(sample_points),
         ELEMENT_PARSER_CTOR(sample_scalings),
@@ -41,23 +45,29 @@ public:
 
 #undef ELEMENT_PARSER_CTOR
 
-        bilinear_basis_parser(skip,
-                              [this](Polynomial_Vector &&value) {
-                                if(!this->bilinear_basis.has_value())
-                                  this->bilinear_basis = {value, value};
-                              }),
-        bilinear_basis_0_parser(skip,
-                                [this](Polynomial_Vector &&value) {
-                                  if(!this->bilinear_basis.has_value())
-                                    this->bilinear_basis.emplace();
-                                  this->bilinear_basis.value()[0]
-                                    = std::move(value);
-                                }),
-        bilinear_basis_1_parser(skip, [this](Polynomial_Vector &&value) {
-          if(!this->bilinear_basis.has_value())
-            this->bilinear_basis.emplace();
-          this->bilinear_basis.value()[1] = std::move(value);
-        })
+        bilinear_basis_parser(
+          skip,
+          [this](Polynomial_Vector &&value) {
+            if(!this->bilinear_basis.has_value())
+              this->bilinear_basis = {value, value};
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...),
+        bilinear_basis_0_parser(
+          skip,
+          [this](Polynomial_Vector &&value) {
+            if(!this->bilinear_basis.has_value())
+              this->bilinear_basis.emplace();
+            this->bilinear_basis.value()[0] = std::move(value);
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...),
+        bilinear_basis_1_parser(
+          skip,
+          [this](Polynomial_Vector &&value) {
+            if(!this->bilinear_basis.has_value())
+              this->bilinear_basis.emplace();
+            this->bilinear_basis.value()[1] = std::move(value);
+          },
+          [] {}, std::forward<TArgs>(float_parser_args)...)
   {}
 
 private:
