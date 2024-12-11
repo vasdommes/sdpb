@@ -182,7 +182,6 @@ def build(bld):
                         'src/pmp_read/read_nsv_file_list.cxx',
                         'src/pmp_read/read_polynomial_matrix_program.cxx',
                         'src/pmp_read/read_json/read_json.cxx',
-                        'src/pmp_read/read_json/Json_PMP_Parser.cxx',
                         'src/pmp_read/read_mathematica/read_mathematica.cxx',
                         'src/pmp_read/read_mathematica/parse_SDP/parse_SDP.cxx',
                         'src/pmp_read/read_mathematica/parse_SDP/parse_matrices.cxx',
