@@ -193,6 +193,10 @@ def build(bld):
                         'src/pmp_read/read_xml/Xml_Parser/on_start_element.cxx',
                         'src/pmp_read/read_xml/Xml_Parser/on_end_element.cxx',
                         'src/pmp_read/read_xml/Xml_Parser/on_characters.cxx',
+                        'src/pmp_read/simpleboot/parse_MMA_expr.cxx',
+                        'src/pmp_read/simpleboot/parse_parameter_file.cxx',
+                        'src/pmp_read/simpleboot/simpleboot.cxx',
+                        'src/pmp_read/simpleboot/test.cxx',
                         ]
 
     bld.stlib(source=pmp_read_sources,

@@ -1,41 +1,33 @@
+#include "parse_MMA_expr.hxx"
 
-
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem.hpp>
-
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-
-#include <boost/serialization/vector.hpp>
-#include <boost/algorithm/string.hpp>
-
-#include <boost/math/tools/polynomial.hpp>
-
-#include <set>
-
-#include <vector>
-#include <string>
-
-#include <utility>
-
-#include <variant>
+#include "pmp/Polynomial.hxx"
+#include "pmp/Polynomial_Vector_Matrix.hxx"
+#include "pmp_read/read_mathematica/parse_SDP/parse_number.hxx"
+#include "sdpb_util/Boost_Float.hxx"
 
 #include <El.hpp>
 
-#include <deque>
+#include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/math/tools/polynomial.hpp>
+#include <boost/serialization/vector.hpp>
+
+#include <filesystem>
 #include <list>
 #include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include "pmp/Polynomial_Vector_Matrix.hxx"
-#include "parse_vector.hxx"
-#include "sdpb_util/Boost_Float.hxx"
-#include "pmp/Polynomial.hxx"
+////////////////////////////////////////  infrastructure //////////////////////////////////////
 
-////////////////////////////////////////  infarestructure //////////////////////////////////////
-
-inline Boost_Float Pochhammer(const Boost_Float &alpha, const int64_t &n)
+Boost_Float Pochhammer(const Boost_Float &alpha, const int64_t &n)
 {
   Boost_Float result(1);
   for(int64_t kk = 0; kk < n; ++kk)
@@ -47,20 +39,15 @@ inline Boost_Float Pochhammer(const Boost_Float &alpha, const int64_t &n)
 
 ////////////////////////////////////////   parse Mathematica expression //////////////////////////////////////
 
-std::string parse_number(const char *begin, const char *end);
-
-//////////////
-
 template <class InputIterator>
-inline InputIterator find_delimiters(InputIterator begin, InputIterator end,
-                                     const std::string delimiters)
+InputIterator find_delimiters(InputIterator begin, InputIterator end,
+                              const std::string delimiters)
 {
   return std::find_first_of(begin, end, delimiters.begin(), delimiters.end());
 };
 
 const std::string MMA_expr_delimiters("()[]{}+-*/^, \t\n\v\f\r");
-inline const char *
-find_next_MMA_expr_delimiters(const char *begin, const char *end)
+const char *find_next_MMA_expr_delimiters(const char *begin, const char *end)
 {
   const char *pstr = find_delimiters(begin, end, MMA_expr_delimiters);
   if(*pstr == '\n' && pstr > begin && pstr < end
@@ -76,47 +63,22 @@ find_next_MMA_expr_delimiters(const char *begin, const char *end)
 }
 
 template <typename T>
-inline bool string_containQ(const std::string &str, const T substr)
+bool string_containQ(const std::string &str, const T substr)
 {
   return str.find(substr) != std::string::npos;
 };
 
-inline bool string_contain_delimiters_Q(const std::string &str,
-                                        const std::string delimiters)
+bool string_contain_delimiters_Q(const std::string &str,
+                                 const std::string &delimiters)
 {
   return find_delimiters(str.begin(), str.end(), delimiters) != str.end();
 };
 
-inline bool string_contain_MMA_delimiters_Q(const std::string &str)
+bool string_contain_MMA_delimiters_Q(const std::string &str)
 {
   return find_delimiters(str.begin(), str.end(), MMA_expr_delimiters)
          != str.end();
 };
-
-using MMA_TOKEN = std::variant<std::monostate, int, El::BigFloat, char,
-                               std::string, std::string>;
-#define MMA_TOKEN_Invalid 0
-#define MMA_TOKEN_Integer 1
-#define MMA_TOKEN_Real 2
-#define MMA_TOKEN_Operator 3
-#define MMA_TOKEN_Symbol 4
-#define MMA_TOKEN_String 5
-
-#define AS_MMA_TOKEN(var, T) std::get<MMA_TOKEN_##T>(var)
-#define SET_MMA_TOKEN(var, value, T) var.emplace<MMA_TOKEN_##T>(value)
-
-const char *ptr_MMA_begin;
-const char *ptr_MMA_current;
-
-#define MMA_PARSER_ERROR(flow)                                                \
-  {                                                                           \
-    std::stringstream ss;                                                     \
-    ss << "current ptr in MMA file : " << ptr_MMA_current - ptr_MMA_begin     \
-       << "\n"                                                                \
-       << "file :" << __FILE__ << " line : " << __LINE__ << " :\n"            \
-       << flow;                                                               \
-    throw std::runtime_error(ss.str());                                       \
-  }
 
 std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v)
 {
@@ -187,11 +149,6 @@ parse_get_token_func(const char *begin, const char *end, MMA_TOKEN &token)
 {
   ptr_MMA_current = begin;
 
-  auto skip_space_l = [](const char *b, const char *e) {
-    return std::find_if_not(b, e,
-                            [](const char pc) { return std::isspace(pc); });
-  };
-
   const char *p = skip_space_from_left(begin, end); //skip_space_l(begin,end);
 
   if(p == end)
@@ -232,7 +189,6 @@ parse_get_token_func(const char *begin, const char *end, MMA_TOKEN &token)
         }
       else
         {
-          //std::cout << p - end << " : token read : real number raw_string =" << std::string(p, q) << "\ncleaned_string = " << parse_number(p, q) << "\n";
           SET_MMA_TOKEN(token, El::BigFloat(parse_number(p, q)), Real);
         }
 
@@ -253,9 +209,7 @@ parse_get_token_func(const char *begin, const char *end, MMA_TOKEN &token)
       auto q = std::find(p + 1, end, '\"');
       if(q == end)
         {
-          std::cout << "Unrecognizable expression :" << std::string(p, q)
-                    << "\n";
-          exit(0);
+          RUNTIME_ERROR("Unrecognizable expression: ", std::string(p, q));
         }
       SET_MMA_TOKEN(token, std::string(p + 1, q), String);
       return q + 1;
@@ -264,15 +218,10 @@ parse_get_token_func(const char *begin, const char *end, MMA_TOKEN &token)
   // handle "\\\n" case
   if(*p == '\\' && *(p + 1) == '\n')
     {
-      std::cout << "the code shouldn't reach here :" << std::string(p, p + 20)
-                << "\n";
-      exit(0);
-      return parse_get_token(p + 2, end, token);
+      RUNTIME_ERROR("the code shouldn't reach here: ", std::string(p, p + 20));
     }
 
-  std::cout << "Unrecognizable expression :" << std::string(p, p + 10) << "\n";
-  exit(0);
-  return "";
+  RUNTIME_ERROR("Unrecognizable expression: ", std::string(p, p + 10));
 }
 
 // this is a wrapper to keep track of the debug information
@@ -281,7 +230,6 @@ parse_get_token(const char *begin, const char *end, MMA_TOKEN &token)
 {
   const char *parse_begin = begin;
   const char *parse_end = parse_get_token_func(begin, end, token);
-  //std::cout << "parse_get_token parse " << std::string(parse_begin, parse_end) << " to be " << token << "\n";
   return parse_end;
 }
 
@@ -324,12 +272,14 @@ std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v)
           case MMA_EXPR_Polynomial:
             os << "[Polynomial " << AS_MMA_EXPR(elmt, Polynomial) << "]";
             break;
+          default: LOGIC_ERROR(DEBUG_STRING(elmt.index()));
           }
         break;
       }
     case MMA_ELEMENT_Operator:
       os << "[Operator " << AS_MMA_ELEMENT(v, Operator) << "]";
       break;
+    default: LOGIC_ERROR(DEBUG_STRING(v.index()));
     }
   return os;
 }
@@ -416,17 +366,16 @@ parse_MMA_element(const char *begin, const char *end, MMA_ELEMENT &result)
 
     case MMA_TOKEN_String:
     default:
-      MMA_PARSER_ERROR("Un expected token : " << token << " before "
-                                              << std::string(pstr, pstr + 10)
-                                              << "\n");
+      MMA_PARSER_ERROR("Unexpected token : " << token << " before "
+                                             << std::string(pstr, pstr + 10)
+                                             << "\n");
       break;
     }
   return begin;
 }
 
-inline const char *
-parse_MMA_element_as_expression(const char *begin, const char *end,
-                                MMA_ELEMENT &result)
+const char *parse_MMA_element_as_expression(const char *begin, const char *end,
+                                            MMA_ELEMENT &result)
 {
   const char *pstr = parse_MMA_element(begin, end, result);
 
@@ -453,7 +402,7 @@ const char *parse_MMA_expr_as_number(const char *begin, const char *end,
   return pstr;
 }
 
-inline bool parse_MMA_expr_delimitersQ(MMA_ELEMENT &elmt)
+bool parse_MMA_expr_delimitersQ(const MMA_ELEMENT &elmt)
 {
   if(elmt.index() == MMA_ELEMENT_Invalid)
     return true;
@@ -504,10 +453,6 @@ const char *parse_MMA_expr_list(const char *begin, const char *end,
 
   while(pstr != end)
     {
-      //const char * pstr_next = parse_MMA_element(pstr, end, elmt);
-      //if (parse_MMA_expr_delimitersQ(elmt)) break;
-      //pstr = pstr_next;
-
       pstr = parse_MMA_element(pstr, end, elmt);
 
       if(parse_MMA_expr_delimitersQ(elmt))
@@ -543,7 +488,7 @@ const char *parse_MMA_expr_list(const char *begin, const char *end,
   return pstr;
 }
 
-inline int parse_MMA_precedence(const char op)
+int parse_MMA_precedence(const char op)
 {
   switch(op)
     {
@@ -558,13 +503,14 @@ inline int parse_MMA_precedence(const char op)
       break;
     }
 }
-inline bool parse_MMA_precedence_orderedQ(MMA_ELEMENT &op1, MMA_ELEMENT &op2)
+bool parse_MMA_precedence_orderedQ(const MMA_ELEMENT &op1,
+                                   const MMA_ELEMENT &op2)
 {
   return parse_MMA_precedence(AS_MMA_ELEMENT(op1, Operator))
          <= parse_MMA_precedence(AS_MMA_ELEMENT(op2, Operator));
 }
 
-inline void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
+void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -595,7 +541,7 @@ inline void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
                    << e1.index() << " e2.index() = " << e2.index() << "\n");
 }
 
-inline void parse_MMA_expr_substract(MMA_EXPR &e1, MMA_EXPR &e2)
+void parse_MMA_expr_substract(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -626,7 +572,7 @@ inline void parse_MMA_expr_substract(MMA_EXPR &e1, MMA_EXPR &e2)
   MMA_PARSER_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = "
                    << e1.index() << " e2.index() = " << e2.index() << "\n");
 }
-inline void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
+void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -651,7 +597,7 @@ inline void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
                    << e1.index() << " e2.index() = " << e2.index() << "\n");
 }
 
-inline void parse_MMA_expr_divide(MMA_EXPR &e1, MMA_EXPR &e2)
+void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -669,7 +615,7 @@ inline void parse_MMA_expr_divide(MMA_EXPR &e1, MMA_EXPR &e2)
                    << e1.index() << " e2.index() = " << e2.index() << "\n");
 }
 
-inline void parse_MMA_expr_power(MMA_EXPR &e1, MMA_EXPR &e2)
+void parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -683,8 +629,8 @@ inline void parse_MMA_expr_power(MMA_EXPR &e1, MMA_EXPR &e2)
                    << e1.index() << " e2.index() = " << e2.index() << "\n");
 }
 
-inline void parse_MMA_expr_single_operate(std::list<MMA_ELEMENT> &chain,
-                                          std::list<MMA_ELEMENT>::iterator it)
+void parse_MMA_expr_single_operate(std::list<MMA_ELEMENT> &chain,
+                                   std::list<MMA_ELEMENT>::iterator it)
 {
   auto it_l = std::prev(it);
   auto it_r = std::next(it);
@@ -726,8 +672,6 @@ parse_MMA_expr(const char *begin, const char *end, MMA_ELEMENT &result)
   std::list<MMA_ELEMENT> chain;
   const char *pstr = parse_MMA_expr_list(begin, end, chain);
 
-  //for (auto ele : chain) std::cout << "Find element : " << ele << "\n\n";
-
   while(chain.size() > 1)
     {
       for(auto op = std::next(chain.begin()); op != chain.end();
@@ -737,9 +681,7 @@ parse_MMA_expr(const char *begin, const char *end, MMA_ELEMENT &result)
           if(next_op == chain.end()
              || parse_MMA_precedence_orderedQ(*op, *next_op))
             {
-              //std::cout << "operate : " << *std::prev(op) << *op << *std::next(op) << "\n";
               parse_MMA_expr_single_operate(chain, op);
-              //std::cout << "result  : " << *std::prev(next_op) << "\n";
               break;
             }
         }
@@ -751,8 +693,8 @@ parse_MMA_expr(const char *begin, const char *end, MMA_ELEMENT &result)
 
 ////////////  Symbol ///////////////////////////////
 
-inline const char *parse_MMA_check_op(const char *begin, const char *end,
-                                      MMA_TOKEN &token, char op)
+const char *parse_MMA_check_op(const char *begin, const char *end,
+                               MMA_TOKEN &token, char op)
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator
@@ -763,8 +705,8 @@ inline const char *parse_MMA_check_op(const char *begin, const char *end,
   return pstr;
 }
 
-inline const char *parse_MMA_get_op(const char *begin, const char *end,
-                                    MMA_TOKEN &token, char &op)
+const char *parse_MMA_get_op(const char *begin, const char *end,
+                             MMA_TOKEN &token, char &op)
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator)
@@ -775,8 +717,8 @@ inline const char *parse_MMA_get_op(const char *begin, const char *end,
   return pstr;
 }
 
-inline const char *parse_MMA_token_as_int(const char *begin, const char *end,
-                                          MMA_TOKEN &token, int &intnum)
+const char *parse_MMA_token_as_int(const char *begin, const char *end,
+                                   MMA_TOKEN &token, int &intnum)
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Integer)
@@ -787,8 +729,8 @@ inline const char *parse_MMA_token_as_int(const char *begin, const char *end,
   return pstr;
 }
 
-inline const char *parse_MMA_token_as_float(const char *begin, const char *end,
-                                            MMA_TOKEN &token, El::BigFloat &f)
+const char *parse_MMA_token_as_float(const char *begin, const char *end,
+                                     MMA_TOKEN &token, El::BigFloat &f)
 {
   const char *pstr = parse_get_token(begin, end, token);
 
@@ -812,9 +754,8 @@ inline const char *parse_MMA_token_as_float(const char *begin, const char *end,
   return pstr;
 }
 
-inline const char *
-parse_MMA_token_as_string(const char *begin, const char *end, MMA_TOKEN &token,
-                          std::string &str)
+const char *parse_MMA_token_as_string(const char *begin, const char *end,
+                                      MMA_TOKEN &token, std::string &str)
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_String)
@@ -824,28 +765,6 @@ parse_MMA_token_as_string(const char *begin, const char *end, MMA_TOKEN &token,
   str = std::move(AS_MMA_TOKEN(token, String));
   return pstr;
 }
-
-////////////////// build-in function and symbols ////////////////////////
-
-namespace param
-{
-  El::BigFloat dim, nu;
-  int kappa;
-  int maxderivs; // only used for interval positivity
-  std::string block_folder;
-  std::vector<std::string> input_files;
-  std::map<std::string, El::BigFloat> var_map;
-
-  Boost_Float r_crossing_4;
-  bool MPI_F_FS_parallelQ = false;
-}
-
-bool internal_print_Q = false;
-
-std::map<std::pair<std::string, int>,
-         std::vector<std::vector<std::vector<El::BigFloat>>>>
-  blockF;
-std::map<std::pair<std::string, int>, int> blockF_key2index;
 
 int MPI_stamp_spin_to_rank(const std::string &stamp, int L)
 {
@@ -871,7 +790,7 @@ void generate_blockF_key2index(
   const std::string &block_folder,
   std::map<std::pair<std::string, int>, int> &blockF_key2index)
 {
-  namespace fs = boost::filesystem;
+  namespace fs = std::filesystem;
 
   for(auto const &file : fs::recursive_directory_iterator(block_folder))
     {
@@ -950,7 +869,7 @@ int init_binomial_coeff(int N)
 }
 
 // return Binomial[m,n] , assuming m>=n
-inline mpz_class binomial_coeff(int m, int n)
+mpz_class binomial_coeff(int m, int n)
 {
   if(m > binomial_cache_N)
     init_binomial_coeff(m);
@@ -958,7 +877,7 @@ inline mpz_class binomial_coeff(int m, int n)
 }
 
 // return Binomial[m,n] , assuming m>=n
-inline mpz_class binomial_coeff_cached(int m, int n)
+mpz_class binomial_coeff_cached(int m, int n)
 {
   return binomial_cache[m][n];
 }
@@ -999,11 +918,11 @@ void interval_transformation(std::vector<El::BigFloat> &coeff,
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-// 2022/5/27 : Note on parallization : for objective and normalization, the before call parse_vector, the param::MPI_F_FS_parallelQ is set to be true
-// so that parse_vector is parallized. The parallelization scheme is the following : the vector contains many symbols (F,FS,P,PT,F0, ...), but has no constant
+// 2022/5/27 : Note on parallelization : for objective and normalization, before call parse_vector, the param::MPI_F_FS_parallelQ is set to be true
+// so that parse_vector is parallelized. The parallelization scheme is the following : the vector contains many symbols (F,FS,P,PT,F0, ...), but has no constant
 // Each MPI process will parse a set of symbols and skip other symbols (i.e. set them to 0). Then the final result is collected using mpi_allreduce
-// For positivity condition matrices, the parallelization scheme is that each MPI process handle a entire matrix. So when process symbols,
-// the param::MPI_F_FS_parallelQ is set to false. Because the polynomial will never appear in objective/ normalization, therefore the symbol P, PT don't have
+// For positivity condition matrices, the parallelization scheme is that each MPI process handle the entire matrix. So when process symbols,
+// the param::MPI_F_FS_parallelQ is set to false. Because the polynomial will never appear in objective/normalization, the symbols P, PT don't have
 // param::MPI_F_FS_parallelQ type of parallelization
 
 El::BigFloat Fprefactor(int L, const El::BigFloat &x)
@@ -1056,7 +975,7 @@ void load_block_folder(
   std::map<std::pair<std::string, int>,
            std::vector<std::vector<std::vector<El::BigFloat>>>> &blockF);
 
-inline auto &blockF_lookup(const std::string &stamp, int L, int m, int n)
+auto &blockF_lookup(const std::string &stamp, int L, int m, int n)
 {
   auto pblock = blockF.find(std::make_pair(stamp, L));
   if(pblock == blockF.end())
@@ -1074,8 +993,8 @@ inline auto &blockF_lookup(const std::string &stamp, int L, int m, int n)
 }
 
 // (-1)^(m + n)*2^(1 + m + n - 2*x)*Poch[1 - m + x, m]*Poch[1 - n + x, n]
-inline void
-simpleboot_internal_F0(El::BigFloat &x, int m, int n, MMA_ELEMENT &result)
+void simpleboot_internal_F0(const El::BigFloat &x, const int m, const int n,
+                            MMA_ELEMENT &result)
 {
   if(param::MPI_F_FS_parallelQ == true && El::mpi::Rank() != 0)
     {
@@ -1093,8 +1012,9 @@ simpleboot_internal_F0(El::BigFloat &x, int m, int n, MMA_ELEMENT &result)
   result = to_BigFloat(BF_result);
 }
 
-inline void simpleboot_internal_F(const std::string &stamp, int L, int m,
-                                  int n, El::BigFloat &x, MMA_ELEMENT &result)
+void simpleboot_internal_F(const std::string &stamp, const int L, const int m,
+                           const int n, const El::BigFloat &x,
+                           MMA_ELEMENT &result)
 {
   if(param::MPI_F_FS_parallelQ == true
      && MPI_stamp_spin_to_rank(stamp, L) != El::mpi::Rank())
@@ -1103,20 +1023,15 @@ inline void simpleboot_internal_F(const std::string &stamp, int L, int m,
       return;
     }
 
-  //std::cout << "rank=" << El::mpi::Rank() << " : stamp=" << stamp << ", L=" << L << " belong to this rank." << " MPI_F_FS_parallelQ=" << param::MPI_F_FS_parallelQ << "\n";
-
   Polynomial poly;
   poly.coefficients = blockF_lookup(stamp, L, m, n);
 
   result = poly(x) * Fprefactor(L, x);
-  //if (internal_print_Q) std::cout << "stamp=" << stamp << ", L=" << L << ", m=" << m << ", n=" << n << ", x=" << x << "\nresult=" << result << "\n";
-
-  //std::cout << "F[" << stamp << "," << L << "," << m << "," << n << "," << x << "]=" << result <<
-  //	"   poly(x)=" << poly(x) << "   Fprefactor(L, x)=" << Fprefactor(L, x) << "\n";
 }
 
-inline void simpleboot_internal_FS(const std::string &stamp, int L, int m,
-                                   int n, El::BigFloat &x, MMA_ELEMENT &result)
+void simpleboot_internal_FS(const std::string &stamp, const int L, const int m,
+                            const int n, const El::BigFloat &x,
+                            MMA_ELEMENT &result)
 {
   if(param::MPI_F_FS_parallelQ == true
      && MPI_stamp_spin_to_rank(stamp, L) != El::mpi::Rank())
@@ -1137,9 +1052,9 @@ inline void simpleboot_internal_FS(const std::string &stamp, int L, int m,
 }
 
 int current_matrix_max_polynomial_degree = -1;
-void simpleboot_internal_PT(const std::string &stamp, int L, int m, int n,
-                            El::BigFloat &a, El::BigFloat &b,
-                            MMA_ELEMENT &result)
+void simpleboot_internal_PT(const std::string &stamp, const int L, const int m,
+                            const int n, const El::BigFloat &a,
+                            const El::BigFloat &b, MMA_ELEMENT &result)
 {
   Polynomial poly;
 
@@ -1170,23 +1085,16 @@ void simpleboot_internal_PT(const std::string &stamp, int L, int m, int n,
 }
 
 void simpleboot_internal_P(const std::string &stamp, int L, int m, int n,
-                           El::BigFloat &shift, MMA_ELEMENT &result)
+                           const El::BigFloat &shift, MMA_ELEMENT &result)
 {
   Polynomial poly;
-  //	result = poly;
-  //	return;
-
   poly.coefficients = blockF_lookup(stamp, L, m, n);
 
   if(shift != El::BigFloat(0))
     {
       poly.shift(shift);
-      //std::cout << "shift=" << shift << ", prec=" << shift.Precision() << "\n";
     }
-
   result = std::move(poly);
-  //std::cout << "result=" << result << "\n";
-  return;
 }
 
 // for my purpose now, I only need
@@ -1296,7 +1204,7 @@ const char *parse_MMA_function(const std::string &name, const char *begin,
       MMA_TOKEN token;
       MMA_ELEMENT element;
 
-      int L, m, n, kappa;
+      int m, n;
       El::BigFloat x;
 
       pstr = parse_MMA_expr_as_number(pstr, end, x);
@@ -1323,18 +1231,16 @@ void parse_MMA_symbol(const std::string &name, MMA_ELEMENT &result)
     MMA_PARSER_ERROR("can't find symbol " << name << "\n");
 
   SET_MMA_ELEMENT(result, pvar->second, Expression);
-
-  //std::cout << "parse_MMA_symbol find symbol " << name << " = " << result << "\n";
-  return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO
 MPI_Win the_window;
 int *window_data;
 int counter_process = 0;
 
-void mpi_counter_init(int init_value = 0)
+void mpi_counter_init(int init_value)
 {
   MPI_Win_allocate(sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD,
                    &window_data, &the_window);
@@ -1350,49 +1256,15 @@ void mpi_counter_init(int init_value = 0)
 
 int mpi_counter_get()
 {
-  //std::cout << "[Rank=" << El::mpi::Rank() << " mpi_counter_get BEGIN]\n";
-  //MPI_Win_fence(0, the_window);
   int counter_value;
   int decrement = 1;
   MPI_Fetch_and_op(&decrement, &counter_value, MPI_INT, counter_process, 0,
                    MPI_SUM, the_window);
-  //MPI_Win_fence(0, the_window);
-  //std::cout << "[Rank=" << El::mpi::Rank() << " mpi_counter_get   END] " << counter_value << "\n";
 
   return counter_value;
 }
 
-void test_mpi()
-{
-  mpi_counter_init();
-
-  std::vector<int> matrix_indices;
-
-  int counter;
-  do
-    {
-      counter = mpi_counter_get();
-      matrix_indices.push_back(counter);
-      std::cout << "current rank : " << El::mpi::Rank()
-                << " get jobid=" << counter << "\n";
-  } while(counter < 200);
-
-  std::cout << "[Rank=" << El::mpi::Rank() << "] "
-            << "matrices_valid_indices=";
-  for(auto i : matrix_indices)
-    std::cout << i << " ";
-  std::cout << "\n";
-
-  return;
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void test_parse_MMA_expr();
-
-void test_gmp_mpfr();
-
-void test_PT();
 
 template <typename T>
 const char *sb_parse_vector(const char *begin, const char *end,
@@ -1408,14 +1280,14 @@ const char *sb_parse_vector(const char *begin, const char *end,
   const auto open_brace(std::find(begin, end, '{'));
   if(open_brace == end)
     {
-      throw std::runtime_error("Missing '{' at beginning of array of numbers");
+      RUNTIME_ERROR("Missing '{' at beginning of array of numbers");
     }
   auto start_element(std::next(open_brace));
 
   const auto close_brace(std::find(start_element, end, '}'));
   if(close_brace == end)
     {
-      throw std::runtime_error("Missing '}' at end of array of numbers");
+      RUNTIME_ERROR("Missing '}' at end of array of numbers");
     }
   const auto brace_end = std::next(close_brace);
 
@@ -1473,10 +1345,11 @@ const char *sb_parse_vector(const char *begin, const char *end,
   return std::next(close_brace);
 }
 
-template const char *sb_parse_vector(const char *begin, const char *end,
-                                     std::vector<El::BigFloat> &result_vector);
-template const char *sb_parse_vector(const char *begin, const char *end,
-                                     std::vector<Boost_Float> &result_vector);
+// TODO
+// template const char *sb_parse_vector(const char *begin, const char *end,
+//                                      std::vector<El::BigFloat> &result_vector);
+// template const char *sb_parse_vector(const char *begin, const char *end,
+//                                      std::vector<Boost_Float> &result_vector);
 
 const char *
 sb_parse_polynomial(const char *begin, const char *end, Polynomial &polynomial)
@@ -1520,331 +1393,9 @@ sb_parse_damped_rational_constant(const char *constant_start, const char *end,
   const char *pstr = parse_MMA_expr_as_number(
     constant_start, end, damped_rational_constant_BigFloat);
   if(pstr == end)
-    throw std::runtime_error("Missing comma after DampedRational.constant");
+    RUNTIME_ERROR("Missing comma after DampedRational.constant");
 
   damped_rational_constant = to_Boost_Float(damped_rational_constant_BigFloat);
 
   return pstr;
 }
-
-/////////////////////////////// parse parameter file //////////////////////////////////////////////////////////
-
-int parse_parameter_find_item(const char *begin, const char *end,
-                              const std::string &itemname,
-                              const char *&begin_item, const char *&end_item,
-                              bool required = true)
-{
-  const std::string item_head("<" + itemname + ">"),
-    item_tail("</" + itemname + ">");
-
-  begin_item = std::search(begin, end, item_head.begin(), item_head.end());
-  end_item = std::search(begin, end, item_tail.begin(), item_tail.end());
-
-  if(begin_item == end && required == false)
-    return 0;
-  begin_item = begin_item + item_head.size();
-
-  if(begin <= begin_item && begin_item < end_item && end_item <= end)
-    return 1;
-
-  MMA_PARSER_ERROR("parse_parameter_file error : can't process item "
-                   << itemname << " correctly\n");
-  return 0;
-}
-
-void load_block_folder(
-  const std::string &block_folder,
-  std::map<std::pair<std::string, int>,
-           std::vector<std::vector<std::vector<El::BigFloat>>>> &blockF);
-
-const char *parse_parameter_file(const char *begin, const char *end)
-{
-  using namespace param;
-
-  const char *begin_item;
-  const char *end_item;
-  MMA_TOKEN token;
-
-  parse_parameter_find_item(begin, end, "kappa", begin_item, end_item);
-  parse_MMA_token_as_int(begin_item, end_item, token, kappa);
-
-  // this is only used for interval positivity
-  if(parse_parameter_find_item(begin, end, "maxderivs", begin_item, end_item,
-                               false))
-    parse_MMA_token_as_int(begin_item, end_item, token, maxderivs);
-  else
-    maxderivs = 0;
-
-  El::BigFloat
-    dim_temp; // If I directly using dim, the dim.Precision() is not correct
-  parse_parameter_find_item(begin, end, "dim", begin_item, end_item);
-  parse_MMA_token_as_float(begin_item, end_item, token, dim_temp);
-
-  dim = std::move(
-    dim_temp); // somehow without std::move, the precision is not correct
-  nu = (dim - 2) / 2;
-  Boost_Float r_crossing_4_temp = (3 - 2 * sqrt(Boost_Float(2))) * 4;
-  r_crossing_4
-    = r_crossing_4_temp; // the precision is correct without std::move
-
-  //std::cout << "parse_parameter_file : \n";
-  //std::cout << "dim_temp=" << dim_temp << ", prec=" << dim_temp.Precision() << "\n";
-  //std::cout << "dim=" << dim << ", prec=" << dim.Precision() << "\n";
-  //std::cout << "r_crossing_4_temp=" << r_crossing_4_temp << ", prec=" << mpfr_get_prec(r_crossing_4_temp.backend().data()) << "\n";
-  //std::cout << "r_crossing_4=" << r_crossing_4 << ", prec=" << mpfr_get_prec(r_crossing_4.backend().data()) << "\n";
-
-  parse_parameter_find_item(begin, end, "block", begin_item, end_item);
-  parse_MMA_token_as_string(begin_item, end_item, token, block_folder);
-
-  parse_parameter_find_item(begin, end, "input", begin_item, end_item);
-  const char *pstr = parse_MMA_check_op(begin_item, end_item, token, '{');
-  char op;
-  std::string filename;
-  while(1)
-    {
-      pstr = parse_MMA_token_as_string(pstr, end_item, token, filename);
-
-      std::cout << "find input files : " << filename << "\n";
-
-      input_files.push_back(std::move(filename));
-      pstr = parse_MMA_get_op(pstr, end_item, token, op);
-      if(op == '}')
-        break;
-      if(op != ',')
-        MMA_PARSER_ERROR(
-          "parse_parameter_file error : expecting ',' , but I get "
-          << op << " before " << std::string(pstr, 20) << "\n");
-    }
-
-  if(parse_parameter_find_item(begin, end, "variables", begin_item, end_item,
-                               false)
-     != 0)
-    {
-      pstr = parse_MMA_check_op(begin_item, end_item, token, '{');
-      std::string var_name;
-      El::BigFloat var_value;
-
-      while(1)
-        {
-          pstr = parse_MMA_token_as_string(pstr, end_item, token, var_name);
-          pstr = parse_MMA_check_op(pstr, end_item, token, ',');
-          pstr = parse_MMA_token_as_float(pstr, end_item, token, var_value);
-
-          var_map.emplace(var_name, var_value);
-
-          pstr = parse_MMA_get_op(pstr, end_item, token, op);
-          if(op == '}')
-            break;
-          if(op != ',')
-            MMA_PARSER_ERROR(
-              "parse_parameter_file error : expecting ',' , but I get "
-              << op << " before " << std::string(pstr, 20) << "\n");
-        }
-    }
-
-  //std::cout << std::setprecision(50) << std::fixed;
-
-  std::cout << "parameter file processed\n";
-  std::cout << "dim=" << dim << "\n";
-  std::cout << "kappa=" << kappa << "\n";
-  std::cout << "block=" << block_folder << "\n";
-
-  std::cout << "input={";
-  for(auto &file : input_files)
-    std::cout << file << " ";
-  std::cout << "}\n";
-
-  std::cout << "variables={\n";
-  for(const auto &[key, value] : var_map)
-    std::cout << key << " = " << value << "\n";
-  std::cout << "}\n";
-
-  //load_block_folder(param::block_folder, blockF);
-  generate_blockF_key2index(param::block_folder, blockF_key2index);
-
-  return end;
-}
-
-int parse_parameter_file(boost::filesystem::path &param_file)
-{
-  boost::filesystem::ifstream input_stream(param_file);
-  if(!input_stream.good())
-    {
-      throw std::runtime_error("Unable to open parameter file: "
-                               + param_file.string());
-    }
-
-  boost::interprocess::file_mapping mapped_file(
-    param_file.c_str(), boost::interprocess::read_only);
-  boost::interprocess::mapped_region mapped_region(
-    mapped_file, boost::interprocess::read_only);
-
-  try
-    {
-      const char *begin(
-        static_cast<const char *>(mapped_region.get_address())),
-        *end(begin + mapped_region.get_size());
-      parse_parameter_file(begin, end);
-    }
-  catch(std::exception &e)
-    {
-      throw std::runtime_error("Error when parsing parameter file "
-                               + param_file.string() + ": " + e.what());
-    }
-  return 1;
-}
-
-/////////////////////////////// start parse input //////////////////////////////////////////////////////////
-
-void read_input(const boost::filesystem::path &input_file,
-                std::vector<El::BigFloat> &objectives,
-                std::vector<El::BigFloat> &normalization,
-                std::vector<Positive_Matrix_With_Prefactor> &matrices,
-                std::vector<int> &matrices_valid_indices);
-
-void sb_parse_input(std::vector<El::BigFloat> &objectives,
-                    std::vector<El::BigFloat> &normalization,
-                    std::vector<Positive_Matrix_With_Prefactor> &matrices,
-                    std::vector<int> &matrices_valid_indices)
-{
-  for(auto &filename : param::input_files)
-    read_input(filename, objectives, normalization, matrices,
-               matrices_valid_indices);
-  return;
-}
-
-/////////////////////////////// test code //////////////////////////////////////////////////////////
-
-void test_PT()
-{
-  Polynomial poly;
-  poly.coefficients = {2, 3.1, 3.2, -10.32};
-
-  std::cout << "test interval transformation : p(x) = " << poly << "\n";
-
-  interval_transformation(poly.coefficients, 2.3, 5.3, 20);
-
-  std::cout << "transformed p = " << poly << "\n";
-}
-
-void test_gmp_mpfr()
-{
-  using namespace param;
-
-  std::cout << "------- test gmp begin ----------------\n";
-
-  // set constant
-  //r_crossing_4 = (3 - 2 * sqrt(Boost_Float(2))) * 4;
-
-  Boost_Float rstar4 = (3 - 2 * sqrt(Boost_Float(2))) * 4;
-
-  std::cout << "mpfr_get_default_prec() =" << mpfr_get_default_prec() << "\n";
-  std::cout << "Boost_Float default precision="
-            << Boost_Float::default_precision() << "\n";
-
-  std::cout << std::setprecision(200) << std::fixed;
-  std::cout << "rstar4=" << rstar4
-            << ", prec=" << mpfr_get_prec(rstar4.backend().data()) << "\n";
-
-  std::cout << "r_crossing_4=" << r_crossing_4
-            << ", prec=" << mpfr_get_prec(r_crossing_4.backend().data())
-            << "\n";
-
-  r_crossing_4 = rstar4;
-
-  std::cout << "r_crossing_4=" << r_crossing_4
-            << ", prec=" << mpfr_get_prec(r_crossing_4.backend().data())
-            << "\n";
-
-  std::cout << "dim=" << dim << ", prec=" << dim.Precision() << "\n";
-  std::cout << "nu=" << nu << ", prec=" << nu.Precision() << "\n";
-
-  FSprefactor(2, "3.14");
-  FSprefactor(1, "3.145");
-
-  Fprefactor(2, "3.14");
-  Fprefactor(1, "3.145");
-
-  std::cout << "FSprefactor(0, 0.412)=" << FSprefactor(0, "0.412") << "\n";
-  std::cout << "FSprefactor(2, 0)=" << FSprefactor(2, "0") << "\n";
-
-  std::cout << "--------- test gmp end ----------------\n";
-
-  exit(0);
-  return;
-}
-
-//std::string test_str = "2.3 - 0.3 P[stamp, 1, 1, 2, -0.134] + P[stamp, 1, 1, 2, 3.1*sym+13.2`200]/(1+3) - P[stamp, 0, 1, 2, 0.134] +1.3 , 2+3  ";
-
-std::string test_str
-  = "F[\"Fespsigespsig\", 0, 1, 0, -0.4819999999999999840127884453977458178997\\\n\
-03979492187499999999999999999999999999999999999999999999999999999999999999999\\\n\
-99999999999999999999999999999999999999999999999999999999999999999999999999999\\\n\
-999999999999999999`200.]";
-
-void test_parse_MMA_expr()
-{
-  std::cout << "test=" << test_str << "\n";
-
-  const char *begin = test_str.c_str();
-  const char *end = test_str.c_str() + test_str.size();
-
-  MMA_ELEMENT result;
-  parse_MMA_expr(begin, end, result);
-
-  std::cout << "result=" << result << "\n";
-
-  return;
-}
-
-void test_MMA_element()
-{
-  const char *begin = test_str.c_str();
-  const char *end = test_str.c_str() + test_str.size();
-
-  std::cout.precision(15);
-
-  const char *pstr = begin;
-  int i = 1;
-  while(pstr != end && i <= 5000)
-    {
-      MMA_ELEMENT element;
-
-      std::cout << "current str = " << pstr << "\n";
-
-      pstr = parse_MMA_element(pstr, end, element);
-      std::cout << "Find element #" << i << " : " << element << "\n";
-
-      if(element.index() == 0)
-        break;
-
-      i++;
-    }
-  exit(0);
-  return;
-}
-
-/////////////////////// trash //////////////////////////////////////
-
-/*
-inline void simpleboot_internal_P2(const std::string & stamp, int L, int m, int n, El::BigFloat & shift, MMA_ELEMENT & result)
-{
-Polynomial poly;
-switch (L)
-{
-case 0:
-poly.coefficients.assign({ m,2,4,7.5 });
-poly.shift(shift);
-break;
-case 1:
-poly.coefficients.assign({ m + n, 1.7 });
-poly.shift(shift);
-break;
-default:
-poly.coefficients.assign({ 1, 0 });
-break;
-}
-result = poly;
-return;
-}
-*/

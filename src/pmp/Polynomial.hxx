@@ -11,7 +11,6 @@
 
 #include <El.hpp>
 
-#include <iostream>
 #include <vector>
 #include <boost/math/tools/polynomial.hpp>
 
@@ -78,41 +77,45 @@ public:
     return os;
   }
 
-  inline void operator+=(const El::BigFloat &b) { coefficients[0] += b; }
-  inline void operator-=(const El::BigFloat &b) { coefficients[0] -= b; }
-  inline void operator*=(const El::BigFloat &b)
+  // TODO after arithmetic operations, remove highest-order coefficients if they are zero?
+
+  void operator+=(const El::BigFloat &b) { coefficients[0] += b; }
+  void operator-=(const El::BigFloat &b) { coefficients[0] -= b; }
+  void operator*=(const El::BigFloat &b)
   {
     for(auto &coeff : coefficients)
       coeff *= b;
   }
-  inline void operator/=(const El::BigFloat &b)
+  void operator/=(const El::BigFloat &b)
   {
     for(auto &coeff : coefficients)
       coeff /= b;
   }
-  inline void operator+=(const Polynomial &b)
+  void operator+=(const Polynomial &b)
   {
     if(coefficients.size() < b.coefficients.size())
       coefficients.resize(b.coefficients.size(), 0);
     for(int i = 0; i < b.coefficients.size(); i++)
       coefficients[i] += b.coefficients[i];
   }
-  inline void operator-=(const Polynomial &b)
+  void operator-=(const Polynomial &b)
   {
     if(coefficients.size() < b.coefficients.size())
       coefficients.resize(b.coefficients.size(), 0);
     for(int i = 0; i < b.coefficients.size(); i++)
       coefficients[i] -= b.coefficients[i];
   }
-  inline void operator-()
+  void operator-()
   {
     for(auto &coefficient : coefficients)
       coefficient = -coefficient;
   }
 
   // follow https://www.dealii.org/current/doxygen/deal.II/polynomial_8cc_source.html#l00572
-  void shift(const El::BigFloat offset)
+  void shift(const El::BigFloat &offset)
   {
+    if(offset == El::BigFloat(0))
+      return;
     // Copy coefficients to a vector of
     // accuracy given by the argument
     std::vector<El::BigFloat> new_coefficients(coefficients.begin(),
@@ -163,10 +166,9 @@ public:
         // triangle.
         if(binomial_coefficient != 1)
           {
-            std::stringstream ss;
-            ss << "Polynomial::shift internal error. binomial_coefficient="
-               << binomial_coefficient << ", n=" << n << ", d=" << d << "\n";
-            throw std::runtime_error(ss.str());
+            RUNTIME_ERROR("Polynomial::shift internal error. ",
+                          DEBUG_STRING(binomial_coefficient), DEBUG_STRING(n),
+                          DEBUG_STRING(d));
           }
       }
 
