@@ -49,15 +49,10 @@ using MMA_TOKEN = std::variant<std::monostate, int, El::BigFloat, char,
 inline const char *ptr_MMA_begin;
 inline const char *ptr_MMA_current;
 
-#define MMA_PARSER_ERROR(flow)                                                \
-  {                                                                           \
-    std::stringstream ss;                                                     \
-    ss << "current ptr in MMA file : " << ptr_MMA_current - ptr_MMA_begin     \
-       << "\n"                                                                \
-       << "file :" << __FILE__ << " line : " << __LINE__ << " :\n"            \
-       << flow;                                                               \
-    RUNTIME_ERROR(ss.str());                                                  \
-  }
+#define MMA_PARSER_ERROR(...)                                                 \
+  RUNTIME_ERROR("current ptr in MMA file : ",                                 \
+                ptr_MMA_current - ptr_MMA_begin, "\n", __VA_ARGS__)
+
 
 std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v);
 

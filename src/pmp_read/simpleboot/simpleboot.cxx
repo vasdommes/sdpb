@@ -136,7 +136,7 @@ void test_load()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define MMA_PARSER_ERROR(flow) RUNTIME_ERROR(flow)
+#define MMA_PARSER_ERROR RUNTIME_ERROR
 
 void load_block_folder(
   const std::string &block_folder,

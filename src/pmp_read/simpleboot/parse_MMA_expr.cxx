@@ -326,9 +326,9 @@ parse_MMA_element(const char *begin, const char *end, MMA_ELEMENT &result)
 
               if(token_next.index() != MMA_TOKEN_Operator
                  || AS_MMA_TOKEN(token_next, Operator) != ')')
-                MMA_PARSER_ERROR("Expecting ')' at "
-                                 << std::string(pstr - 1, pstr + 3)
-                                 << "\nBut I got " << token_next << "\n");
+                MMA_PARSER_ERROR("Expected ')' at '",
+                                 std::string(pstr - 1, pstr + 3), "' but got ",
+                                 token_next);
 
               return pstr;
             }
@@ -344,9 +344,8 @@ parse_MMA_element(const char *begin, const char *end, MMA_ELEMENT &result)
             return pstr;
 
           default:
-            MMA_PARSER_ERROR("Un expected operator : "
-                             << op << " before "
-                             << std::string(pstr, pstr + 10) << "\n");
+            MMA_PARSER_ERROR("Unexpected operator : ", op, " before ",
+                             std::string(pstr, pstr + 10));
             break;
           }
       }
@@ -366,9 +365,8 @@ parse_MMA_element(const char *begin, const char *end, MMA_ELEMENT &result)
 
     case MMA_TOKEN_String:
     default:
-      MMA_PARSER_ERROR("Unexpected token : " << token << " before "
-                                             << std::string(pstr, pstr + 10)
-                                             << "\n");
+      MMA_PARSER_ERROR("Unexpected token : ", token, " before ",
+                       std::string(pstr, pstr + 10));
       break;
     }
   return begin;
@@ -380,9 +378,8 @@ const char *parse_MMA_element_as_expression(const char *begin, const char *end,
   const char *pstr = parse_MMA_element(begin, end, result);
 
   if(result.index() != MMA_ELEMENT_Expression)
-    MMA_PARSER_ERROR("Expecting expression at : " << std::string(begin, 10)
-                                                  << ".\nBut I got " << result
-                                                  << "\n");
+    MMA_PARSER_ERROR("Expecting expression at : '", std::string(begin, 10),
+                     "' but got ", result);
   return pstr;
 }
 
@@ -394,9 +391,8 @@ const char *parse_MMA_expr_as_number(const char *begin, const char *end,
 
   if(element.index() != MMA_ELEMENT_Expression
      || AS_MMA_ELEMENT(element, Expression).index() != MMA_EXPR_Number)
-    MMA_PARSER_ERROR("Expecting number at : " << std::string(begin, 10)
-                                              << ".\nBut I got " << element
-                                              << "\n");
+    MMA_PARSER_ERROR("Expected number at : '", std::string(begin, 10),
+                     "' but got ", element);
 
   result = AS_MMA_ELEMENT_Number(element);
   return pstr;
@@ -441,9 +437,7 @@ const char *parse_MMA_expr_list(const char *begin, const char *end,
             chain.push_back(std::move(elmt));
             break;
           }
-        default:
-          MMA_PARSER_ERROR("parse_MMA_expr error 1st op = " << op << "\n");
-          break;
+        default: MMA_PARSER_ERROR("parse_MMA_expr error 1st op = ", op); break;
         }
     }
   else
@@ -480,9 +474,9 @@ const char *parse_MMA_expr_list(const char *begin, const char *end,
           continue;
         }
 
-      MMA_PARSER_ERROR("parse_MMA_expr_Times error : illegal element : "
-                       << elmt << " after " << chain.back() << " before "
-                       << std::string(pstr, 10) << "\n");
+      MMA_PARSER_ERROR("parse_MMA_expr_Times error : illegal element : ", elmt,
+                       " after ", chain.back(), " before '",
+                       std::string(pstr, 10), "'");
     }
 
   return pstr;
@@ -498,8 +492,8 @@ int parse_MMA_precedence(const char op)
     case '/': return 2;
     case '^': return 1;
     default:
-      MMA_PARSER_ERROR(
-        "parse_MMA_precedence unexpected error : illegal op : " << op << "\n");
+      MMA_PARSER_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
+                       op);
       break;
     }
 }
@@ -537,8 +531,8 @@ void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_add unexpected error : e1.index() = "
-                   << e1.index() << " e2.index() = " << e2.index() << "\n");
+  MMA_PARSER_ERROR("parse_MMA_expr_add unexpected error : e1.index() = ",
+                   e1.index(), " e2.index() = ", e2.index());
 }
 
 void parse_MMA_expr_substract(MMA_EXPR &e1, MMA_EXPR &e2)
@@ -569,8 +563,8 @@ void parse_MMA_expr_substract(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = "
-                   << e1.index() << " e2.index() = " << e2.index() << "\n");
+  MMA_PARSER_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = ",
+                   e1.index(), " e2.index() = ", e2.index());
 }
 void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
 {
@@ -593,8 +587,8 @@ void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = "
-                   << e1.index() << " e2.index() = " << e2.index() << "\n");
+  MMA_PARSER_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = ",
+                   e1.index(), " e2.index() = ", e2.index());
 }
 
 void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2)
@@ -611,8 +605,8 @@ void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2)
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_divide unexpected error : e1.index() = "
-                   << e1.index() << " e2.index() = " << e2.index() << "\n");
+  MMA_PARSER_ERROR("parse_MMA_expr_divide unexpected error : e1.index() = ",
+                   e1.index(), " e2.index() = ", e2.index());
 }
 
 void parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2)
@@ -625,8 +619,8 @@ void parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2)
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_power unexpected error : e1.index() = "
-                   << e1.index() << " e2.index() = " << e2.index() << "\n");
+  MMA_PARSER_ERROR("parse_MMA_expr_power unexpected error : e1.index() = ",
+                   e1.index(), " e2.index() = ", e2.index());
 }
 
 void parse_MMA_expr_single_operate(std::list<MMA_ELEMENT> &chain,
@@ -657,8 +651,8 @@ void parse_MMA_expr_single_operate(std::list<MMA_ELEMENT> &chain,
                            AS_MMA_ELEMENT(*it_r, Expression));
       break;
     default:
-      MMA_PARSER_ERROR("parse_MMA_precedence unexpected error : illegal op : "
-                       << AS_MMA_ELEMENT(*it, Operator) << "\n");
+      MMA_PARSER_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
+                       AS_MMA_ELEMENT(*it, Operator));
       break;
     }
 
@@ -699,9 +693,8 @@ const char *parse_MMA_check_op(const char *begin, const char *end,
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator
      || AS_MMA_TOKEN(token, Operator) != op)
-    MMA_PARSER_ERROR("parse_MMA_check_op error : expect "
-                     << op << ", but I got " << token << " from text "
-                     << std::string(begin, 20) << "\n");
+    MMA_PARSER_ERROR("parse_MMA_check_op error : expect ", op, ", but I got ",
+                     token, " from text ", std::string(begin, 20));
   return pstr;
 }
 
@@ -710,9 +703,8 @@ const char *parse_MMA_get_op(const char *begin, const char *end,
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator)
-    MMA_PARSER_ERROR("parse_MMA_get_op error : expect Operator, but I got "
-                     << token << " from text " << std::string(begin, 20)
-                     << "\n");
+    MMA_PARSER_ERROR("parse_MMA_get_op error : expect Operator, but I got ",
+                     token, " from text ", std::string(begin, 20));
   op = AS_MMA_TOKEN(token, Operator);
   return pstr;
 }
@@ -723,8 +715,8 @@ const char *parse_MMA_token_as_int(const char *begin, const char *end,
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Integer)
     MMA_PARSER_ERROR(
-      "parse_MMA_get_token_as_int error : expect integer, but I got "
-      << token << " from text " << std::string(begin, 20) << "\n");
+      "parse_MMA_get_token_as_int error : expect integer, but I got ", token,
+      " from text ", std::string(begin, 20));
   intnum = AS_MMA_TOKEN(token, Integer);
   return pstr;
 }
@@ -744,8 +736,8 @@ const char *parse_MMA_token_as_float(const char *begin, const char *end,
 
   if(token.index() != MMA_TOKEN_Real && token.index() != MMA_TOKEN_Integer)
     MMA_PARSER_ERROR(
-      "parse_MMA_get_token_as_float error : expect Real, but I got "
-      << token << " from text " << std::string(begin, 20) << "\n");
+      "parse_MMA_get_token_as_float error : expect Real, but I got ", token,
+      " from text ", std::string(begin, 20));
 
   if(token.index() == MMA_TOKEN_Integer)
     f = AS_MMA_TOKEN(token, Integer);
@@ -760,8 +752,8 @@ const char *parse_MMA_token_as_string(const char *begin, const char *end,
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_String)
     MMA_PARSER_ERROR(
-      "parse_MMA_get_token_as_float error : expect String, but I got "
-      << token << " from text " << std::string(begin, 20) << "\n");
+      "parse_MMA_get_token_as_float error : expect String, but I got ", token,
+      " from text ", std::string(begin, 20));
   str = std::move(AS_MMA_TOKEN(token, String));
   return pstr;
 }
@@ -769,8 +761,8 @@ const char *parse_MMA_token_as_string(const char *begin, const char *end,
 int MPI_stamp_spin_to_rank(const std::string &stamp, int L)
 {
   if(blockF_key2index.find(std::make_pair(stamp, L)) == blockF_key2index.end())
-    MMA_PARSER_ERROR("MPI_stamp_spin_to_rank error : can not find stamp="
-                     << stamp << ", L=" << L << "\n");
+    MMA_PARSER_ERROR(
+      "MPI_stamp_spin_to_rank error : can not find stamp=", stamp, ", L=", L);
 
   int index = blockF_key2index[std::make_pair(stamp, L)];
 
@@ -800,14 +792,14 @@ void generate_blockF_key2index(
           const std::string filename = file.path().filename().string();
           size_t barL = filename.find("-L");
           if(barL == std::string::npos)
-            MMA_PARSER_ERROR("Load block error : invalid block file name : "
-                             << filename << "\n");
+            MMA_PARSER_ERROR("Load block error : invalid block file name : ",
+                             filename);
           const std::string stamp = filename.substr(0, barL);
           barL += 2;
           size_t dot = filename.find(".", barL);
           if(dot == std::string::npos)
-            MMA_PARSER_ERROR("Load block error : invalid block file name : "
-                             << filename << "\n");
+            MMA_PARSER_ERROR("Load block error : invalid block file name : ",
+                             filename);
           int spin = std::stoi(filename.substr(barL, dot));
 
           blockF_key2index.emplace(std::make_pair(stamp, spin), 0);
@@ -819,24 +811,30 @@ void generate_blockF_key2index(
     blockF_key2index[ptr.first] = i++;
 
   /* // check what file belong to which rank
-	for (auto const & file : fs::recursive_directory_iterator(block_folder))
-	{
-		if (fs::is_regular_file(file) && file.path().extension() == std::string(".block"))
-		{
-			const std::string filename = file.path().filename().string();
-			size_t barL = filename.find("-L");
-			if (barL == std::string::npos) MMA_PARSER_ERROR("Load block error : invalid block file name : " << filename << "\n");
-			const std::string stamp = filename.substr(0, barL);
-			barL += 2;
-			size_t dot = filename.find(".", barL);
-			if (dot == std::string::npos) MMA_PARSER_ERROR("Load block error : invalid block file name : " << filename << "\n");
-			int spin = std::stoi(filename.substr(barL, dot));
+  for(auto const &file : fs::recursive_directory_iterator(block_folder))
+    {
+      if(fs::is_regular_file(file)
+         && file.path().extension() == std::string(".block"))
+        {
+          const std::string filename = file.path().filename().string();
+          size_t barL = filename.find("-L");
+          if(barL == std::string::npos)
+            MMA_PARSER_ERROR("Load block error : invalid block file name : ",
+                             filename);
+          const std::string stamp = filename.substr(0, barL);
+          barL += 2;
+          size_t dot = filename.find(".", barL);
+          if(dot == std::string::npos)
+            MMA_PARSER_ERROR("Load block error : invalid block file name : ",
+                             filename);
+          int spin = std::stoi(filename.substr(barL, dot));
 
-			if (MPI_stamp_spin_to_rank(stamp, spin) == El::mpi::Rank())
-				std::cout << "I found " << file.path().filename().string() << " belongs to current rank=" << El::mpi::Rank() << "\n";
-		}
-	}
-	*/
+          if(MPI_stamp_spin_to_rank(stamp, spin) == El::mpi::Rank())
+            El::Output("I found ", file.path().filename().string(),
+                       " belongs to current rank=", El::mpi::Rank());
+        }
+    }
+    */
 }
 
 //////////////////// cache for binomial coefficient, interval transformation ////////////////////////////////
@@ -985,9 +983,8 @@ auto &blockF_lookup(const std::string &stamp, int L, int m, int n)
     }
 
   if(pblock->second.size() < m + 1 || pblock->second.at(m).size() < n + 1)
-    MMA_PARSER_ERROR("can't find polynomial for stamp=" << stamp << " L=" << L
-                                                        << " m=" << m
-                                                        << " n=" << n << "\n");
+    MMA_PARSER_ERROR("can't find polynomial for stamp=", stamp, " L=", L,
+                     " m=", m, " n=", n);
 
   return pblock->second.at(m).at(n);
 }
@@ -1040,15 +1037,18 @@ void simpleboot_internal_FS(const std::string &stamp, const int L, const int m,
       return;
     }
 
-  //std::cout << "rank=" << El::mpi::Rank() << " : stamp=" << stamp << ", L=" << L << " belong to this rank." << " MPI_F_FS_parallelQ=" << param::MPI_F_FS_parallelQ << "\n";
+  // El::Output("rank=", El::mpi::Rank(), " : stamp=", stamp, ", L=", L,
+  //            " belong to this rank.",
+  //            " MPI_F_FS_parallelQ=", param::MPI_F_FS_parallelQ);
 
   Polynomial poly;
   poly.coefficients = blockF_lookup(stamp, L, m, n);
 
   result = poly(x) * FSprefactor(L, x);
 
-  //std::cout << "FS[" << stamp << "," << L << "," << m << "," << n << "," << x << "]=" << result <<
-  //	"   poly(x)=" << poly(x) << "   FSprefactor(" << L << "," << x << ")=" << FSprefactor(L, x) << "\n";
+  // El::Output("FS[", stamp, ",", L, ",", m, ",", n, ",", x, "]=", result,
+  //            "   poly(x)=", poly(x), "   FSprefactor(", L, ",", x,
+  //            ")=", FSprefactor(L, x));
 }
 
 int current_matrix_max_polynomial_degree = -1;
@@ -1066,21 +1066,20 @@ void simpleboot_internal_PT(const std::string &stamp, const int L, const int m,
 
   if(current_matrix_max_polynomial_degree
      != poly.degree() + (param::maxderivs - m - n))
-    MMA_PARSER_ERROR("inconsistent polynomial degree : prediction from stamp="
-                     << stamp << ", L=" << L << ", m=" << m << ", n=" << n
-                     << " is " << poly.degree() + (param::maxderivs - m - n)
-                     << ", while previous prediction is " << param::maxderivs
-                     << "\n");
+    MMA_PARSER_ERROR("inconsistent polynomial degree : prediction from stamp=",
+                     stamp, ", L=", L, ", m=", m, ", n=", n, " is ",
+                     poly.degree() + (param::maxderivs - m - n),
+                     ", while previous prediction is ", param::maxderivs);
 
   if(param::maxderivs < m + n)
-    MMA_PARSER_ERROR("incorrect maxderivs in the param file: maxderivs="
-                     << param::maxderivs << "\n");
+    MMA_PARSER_ERROR("incorrect maxderivs in the param file: maxderivs=",
+                     param::maxderivs);
 
   interval_transformation(poly.coefficients, a, b,
                           current_matrix_max_polynomial_degree);
 
   result = std::move(poly);
-  //std::cout << "result=" << result << "\n";
+  // El::Output(DEBUG_STRING(result));
   return;
 }
 
@@ -1221,14 +1220,15 @@ const char *parse_MMA_function(const std::string &name, const char *begin,
       return pstr;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_function error : unsupport " << name << " \n");
+  MMA_PARSER_ERROR("parse_MMA_function error : unsupported ",
+                   DEBUG_STRING(name), " \n");
 }
 
 void parse_MMA_symbol(const std::string &name, MMA_ELEMENT &result)
 {
   auto pvar = param::var_map.find(name);
   if(pvar == param::var_map.end())
-    MMA_PARSER_ERROR("can't find symbol " << name << "\n");
+    MMA_PARSER_ERROR("can't find symbol ", name);
 
   SET_MMA_ELEMENT(result, pvar->second, Expression);
 }
@@ -1270,13 +1270,6 @@ template <typename T>
 const char *sb_parse_vector(const char *begin, const char *end,
                             std::vector<T> &result_vector)
 {
-  //test_PT();
-  //exit(0);
-
-  //std::cout << std::setprecision(50) << std::fixed;
-  //test_gmp_mpfr();
-  //exit(0);
-
   const auto open_brace(std::find(begin, end, '{'));
   if(open_brace == end)
     {
@@ -1300,9 +1293,8 @@ const char *sb_parse_vector(const char *begin, const char *end,
 
       if(element.index() != MMA_ELEMENT_Expression
          || AS_MMA_ELEMENT(element, Expression).index() != MMA_EXPR_Number)
-        MMA_PARSER_ERROR("sb_parse_vector error : expect number , but I got "
-                         << element << " before "
-                         << std::string(start_element, 20) << "\n");
+        MMA_PARSER_ERROR("sb_parse_vector error : expect number , but I got ",
+                         element, " before ", std::string(start_element, 20));
 
       if constexpr(std::is_same_v<T, El::BigFloat>)
         {
@@ -1316,40 +1308,21 @@ const char *sb_parse_vector(const char *begin, const char *end,
               .gmp_float.get_mpf_t()));
         }
 
-      //std::cout << "[" << result_vector.size() << "]=" << result_vector.back() << "\n";
-
       if(token.index() != MMA_TOKEN_Operator)
         MMA_PARSER_ERROR(
-          "sb_parse_vector error : expect ',' or '}' , but I got "
-          << token << " before " << std::string(start_element, 20) << "\n");
+          "sb_parse_vector error : expect ',' or '}' , but I got ", token,
+          " before ", std::string(start_element, 20));
 
       if(AS_MMA_TOKEN(token, Operator) == '}')
         break;
 
       if(AS_MMA_TOKEN(token, Operator) != ',')
-        MMA_PARSER_ERROR("sb_parse_vector error : expect ',' , but I got "
-                         << token << " before "
-                         << std::string(start_element, 20) << "\n");
+        MMA_PARSER_ERROR("sb_parse_vector error : expect ',' , but I got ",
+                         token, " before ", std::string(start_element, 20));
     }
-
-  /*
-	int prev_prec = std::cout.precision();
-	//std::cout << "from text : \n";
-	//std::cout << std::string(begin, std::next(close_brace));
-	std::cout << "\nRank=" << El::mpi::Rank() << "\nparse vector : {" << std::setprecision(20);
-	for (auto & a : result_vector) std::cout << a << ", ";
-	std::cout << "}\n" << std::setprecision(prev_prec);
-	exit(0);
-	*/
 
   return std::next(close_brace);
 }
-
-// TODO
-// template const char *sb_parse_vector(const char *begin, const char *end,
-//                                      std::vector<El::BigFloat> &result_vector);
-// template const char *sb_parse_vector(const char *begin, const char *end,
-//                                      std::vector<Boost_Float> &result_vector);
 
 const char *
 sb_parse_polynomial(const char *begin, const char *end, Polynomial &polynomial)
@@ -1360,8 +1333,8 @@ sb_parse_polynomial(const char *begin, const char *end, Polynomial &polynomial)
   const char *pstr = parse_MMA_expr(begin, end, element);
 
   if(element.index() != MMA_ELEMENT_Expression)
-    MMA_PARSER_ERROR("sb_parse_vector error : expect polynomial , but I got "
-                     << element << " from " << std::string(begin, 20) << "\n");
+    MMA_PARSER_ERROR("sb_parse_vector error : expect polynomial , but I got ",
+                     element, " from ", std::string(begin, 20));
 
   MMA_EXPR &expr = AS_MMA_ELEMENT(element, Expression); // is this copied
 

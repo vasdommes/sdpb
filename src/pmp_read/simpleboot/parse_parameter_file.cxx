@@ -24,8 +24,8 @@ int parse_parameter_find_item(const char *begin, const char *end,
   if(begin <= begin_item && begin_item < end_item && end_item <= end)
     return 1;
 
-  MMA_PARSER_ERROR("parse_parameter_file error : can't process item "
-                   << itemname << " correctly\n");
+  MMA_PARSER_ERROR("parse_parameter_file error : can't process item ",
+                   itemname, " correctly.");
   return 0;
 }
 
@@ -83,8 +83,8 @@ const char *parse_parameter_file(const char *begin, const char *end)
         break;
       if(op != ',')
         MMA_PARSER_ERROR(
-          "parse_parameter_file error : expecting ',' , but I get "
-          << op << " before " << std::string(pstr, 20) << "\n");
+          "parse_parameter_file error : expected ',' , but got ", op,
+          " before ", std::string(pstr, 20));
     }
 
   if(parse_parameter_find_item(begin, end, "variables", begin_item, end_item,
@@ -108,8 +108,8 @@ const char *parse_parameter_file(const char *begin, const char *end)
             break;
           if(op != ',')
             MMA_PARSER_ERROR(
-              "parse_parameter_file error : expecting ',' , but I get "
-              << op << " before " << std::string(pstr, 20) << "\n");
+              "parse_parameter_file error : expected ',' , but got ", op,
+              " before ", std::string(pstr, 20));
         }
     }
 
