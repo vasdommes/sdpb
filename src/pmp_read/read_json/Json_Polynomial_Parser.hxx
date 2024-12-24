@@ -5,7 +5,7 @@
 #include "pmp/Polynomial.hxx"
 
 template <class TJson_BigFloat_Parser>
-class Json_Polynomial_Parser final
+class Json_Polynomial_Parser
     : public Abstract_Json_Vector_Parser<Polynomial, TJson_BigFloat_Parser>
 {
   Polynomial result{0, 0};
@@ -13,6 +13,8 @@ class Json_Polynomial_Parser final
 public:
   using element_type = El::BigFloat;
   using value_type = Polynomial;
+
+  virtual ~Json_Polynomial_Parser() = default;
 
   template <class... TArgs>
   Json_Polynomial_Parser(

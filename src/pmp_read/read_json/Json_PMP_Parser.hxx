@@ -7,16 +7,19 @@
 #include "sdpb_util/json/Json_Vector_Parser_With_Skip.hxx"
 
 template <class TFloat> class Json_Simpleboot_Float_Parser;
+class Json_Simpleboot_Polynomial_Parser;
 
 struct PMP_Default_Parsing_Context
 {
   template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
+  using Polynomial_Parser = Json_Polynomial_Parser<Float_Parser<El::BigFloat>>;
 };
 
 struct PMP_Simpleboot_Parsing_Context
 {
   template <class TFloat>
   using Float_Parser = Json_Simpleboot_Float_Parser<TFloat>;
+  using Polynomial_Parser = Json_Simpleboot_Polynomial_Parser;
 };
 
 template <class TFloat>
@@ -38,6 +41,24 @@ private:
   std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
 };
 
+class Json_Simpleboot_Polynomial_Parser final
+    : public Json_Polynomial_Parser<Json_Simpleboot_Float_Parser<El::BigFloat>>
+{
+public:
+  using value_type = Polynomial;
+
+  Json_Simpleboot_Polynomial_Parser(
+    const bool skip, const std::function<void(Polynomial &&)> &on_parsed,
+    const std::function<void()> &on_skipped,
+    const std::shared_ptr<PMP_Simpleboot_Parsing_Context> &context)
+      : Json_Polynomial_Parser(skip, on_parsed, on_skipped, context),
+        context(context)
+  {}
+
+private:
+  std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
+};
+
 template <class TContext>
 class Json_PMP_Parser final
     : public Abstract_Json_Object_Parser<PMP_File_Parse_Result>
@@ -50,10 +71,11 @@ private:
   using Float_Parser = typename TContext::template Float_Parser<TFloat>;
   using BigFloat_Parser = Float_Parser<El::BigFloat>;
   using BigFloat_Vector_Parser = Json_Vector_Parser<BigFloat_Parser>;
+  using Polynomial_Parser = typename TContext::Polynomial_Parser;
 
   using Json_Positive_Matrix_With_Prefactor_Array_Parser
-    = Json_Vector_Parser_With_Skip<
-      Json_Positive_Matrix_With_Prefactor_Parser<Float_Parser>>;
+    = Json_Vector_Parser_With_Skip<Json_Positive_Matrix_With_Prefactor_Parser<
+      Float_Parser, Polynomial_Parser>>;
 
   PMP_File_Parse_Result result;
 
