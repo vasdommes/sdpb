@@ -6,57 +6,10 @@
 #include "sdpb_util/json/Json_Float_Parser.hxx"
 #include "sdpb_util/json/Json_Vector_Parser_With_Skip.hxx"
 
-template <class TFloat> class Json_Simpleboot_Float_Parser;
-class Json_Simpleboot_Polynomial_Parser;
-
 struct PMP_Default_Parsing_Context
 {
   template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
   using Polynomial_Parser = Json_Polynomial_Parser<Float_Parser<El::BigFloat>>;
-};
-
-struct PMP_Simpleboot_Parsing_Context
-{
-  template <class TFloat>
-  using Float_Parser = Json_Simpleboot_Float_Parser<TFloat>;
-  using Polynomial_Parser = Json_Simpleboot_Polynomial_Parser;
-};
-
-template <class TFloat>
-class Json_Simpleboot_Float_Parser final
-    : public Json_String_Element_Parser<TFloat>
-{
-public:
-  using value_type = TFloat;
-
-  Json_Simpleboot_Float_Parser(
-    bool skip, const std::function<void(value_type &&)> &on_parsed,
-    const std::function<void()> &on_skipped,
-    const std::shared_ptr<PMP_Simpleboot_Parsing_Context> &context)
-      : Json_String_Element_Parser<TFloat>(skip, on_parsed, on_skipped),
-        context(context)
-  {}
-
-private:
-  std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
-};
-
-class Json_Simpleboot_Polynomial_Parser final
-    : public Json_Polynomial_Parser<Json_Simpleboot_Float_Parser<El::BigFloat>>
-{
-public:
-  using value_type = Polynomial;
-
-  Json_Simpleboot_Polynomial_Parser(
-    const bool skip, const std::function<void(Polynomial &&)> &on_parsed,
-    const std::function<void()> &on_skipped,
-    const std::shared_ptr<PMP_Simpleboot_Parsing_Context> &context)
-      : Json_Polynomial_Parser(skip, on_parsed, on_skipped, context),
-        context(context)
-  {}
-
-private:
-  std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
 };
 
 template <class TContext>

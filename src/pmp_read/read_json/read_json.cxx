@@ -1,4 +1,5 @@
 #include "pmp_read/read_json/Json_PMP_Parser.hxx"
+#include "pmp_read/simpleboot/PMP_Simpleboot_Parsing_Context.hxx"
 
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/error/en.h>
@@ -26,7 +27,7 @@ read_json(const std::filesystem::path &input_path, bool should_parse_objective,
     [&](PMP_File_Parse_Result &&value) { result = std::move(value); },
     context);
 
-  auto& parser = parser_default;
+  auto &parser = parser_default;
   // auto& parser = parser_simpleboot;
 
   rapidjson::ParseResult res;

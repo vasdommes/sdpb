@@ -8,6 +8,7 @@ template <class TJson_BigFloat_Parser>
 class Json_Polynomial_Parser
     : public Abstract_Json_Vector_Parser<Polynomial, TJson_BigFloat_Parser>
 {
+protected:
   Polynomial result{0, 0};
 
 public:
