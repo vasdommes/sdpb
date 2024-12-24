@@ -6,6 +6,25 @@
 
 #include <exception>
 
+template <class OStream> OStream &build_stream(OStream &os)
+{
+  return os;
+}
+
+template <class OStream, class T, class... ArgPack>
+std::ostream &build_stream(OStream &os, const T &item, const ArgPack &...args)
+{
+  os << item;
+  return build_stream(os, args...);
+}
+
+template <class... ArgPack> std::string build_string(const ArgPack &...args)
+{
+  std::ostringstream os;
+  build_stream(os, args...);
+  return os.str();
+}
+
 // Throw exception with source code location, message and stacktrace.
 // NB: ideally, stacktrace should contain source code location for each frame,
 // but that depends on Boost.Stacktrace configuration.
@@ -13,7 +32,7 @@
 #define THROW(exception_type, ...)                                            \
   do                                                                          \
     {                                                                         \
-      throw exception_type(El::BuildString(                                   \
+      throw exception_type(build_string(                                      \
         "in ", __FUNCTION__, "() at ", __FILE__, ":", __LINE__, ": \n  ",     \
         __VA_ARGS__, "\nStacktrace:\n", boost::stacktrace::stacktrace()));    \
   } while(false)
@@ -26,9 +45,9 @@
   do                                                                          \
     {                                                                         \
       if(!(condition))                                                        \
-        /* El::BuildString() is necessary in case of empty __VA_ARGS__ */     \
+        /* build_string() is necessary in case of empty __VA_ARGS__ */        \
         RUNTIME_ERROR("Assertion '", #condition, "' failed:\n    ",           \
-                      El::BuildString(__VA_ARGS__));                          \
+                      build_string(__VA_ARGS__));                             \
   } while(false)
 
 // Example:
@@ -36,7 +55,7 @@
 // auto s = DEBUG_STRING(x+x) // s = " x+x=='2' "
 // Leading and trailing whitespaces added for convenience
 // in cases like ASSERT(false, "message", DEBUG_STRING(a), DEBUG_STRING(b))
-#define DEBUG_STRING(expr) El::BuildString(" ", #expr, "='", expr, "' ")
+#define DEBUG_STRING(expr) build_string(" ", #expr, "='", expr, "' ")
 
 // Example:
 // int x = 1;
@@ -44,7 +63,7 @@
 // ASSERT_EQUAL(x,y) // Assertion 'x == y' failed: x='1' x='2'
 #define ASSERT_EQUAL(a, b, ...)                                               \
   ASSERT((a) == (b), DEBUG_STRING(a), "\n    ", DEBUG_STRING(b), "\n    ",    \
-         El::BuildString(__VA_ARGS__))
+         build_string(__VA_ARGS__))
 
 #define PRINT_WARNING(...)                                                    \
-  std::cerr << El::BuildString("Warning: ", __VA_ARGS__, "\n")
+  build_stream(std::cerr, "Warning: ", __VA_ARGS__, "\n")
