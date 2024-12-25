@@ -1,6 +1,6 @@
 #pragma once
 
-#include "parse_MMA_expr.hxx"
+#include "mathematica_parse_util.hxx"
 #include "sdpb_util/Boost_Float.hxx"
 
 #include <filesystem>
@@ -35,7 +35,7 @@ public:
   El::BigFloat Fprefactor(int L, const El::BigFloat &x);
   El::BigFloat FSprefactor(int L, const El::BigFloat &x);
 
-private:
+protected:
   virtual Polynomial
   blockF_lookup(const std::string &stamp, int L, int m, int n)
     = 0;
@@ -56,6 +56,19 @@ private:
   Boost_Float r_crossing_4;
   // TODO remove:
   // bool MPI_F_FS_parallelQ = false;
+
+private:
+  std::vector<std::vector<mpz_class>> binomial_cache;
+  int binomial_cache_N = -1;
+
+  // generate table of Binomial[m,n] with m,n<=N
+  int init_binomial_coeff(int N);
+  // return Binomial[m,n] , assuming m>=n
+  mpz_class binomial_coeff_cached(int m, int n);
+  void interval_transformation(std::vector<El::BigFloat> &coeff,
+                             const El::BigFloat &a, const El::BigFloat &b,
+                             int max_degree);
+
 protected:
   Abstract_Simpleboot_Data_Provider()
       : r_crossing_4((3 - 2 * sqrt(Boost_Float(2))) * 4)

@@ -1,5 +1,7 @@
 #include "Simpleboot_Data_Provider.hxx"
 
+#include "mathematica_parse_util.hxx"
+
 // (-1)^(m + n)*2^(1 + m + n - 2*x)*Poch[1 - m + x, m]*Poch[1 - n + x, n]
 void Abstract_Simpleboot_Data_Provider::F0(const El::BigFloat &x, const int m,
                                            const int n, MMA_ELEMENT &result)
@@ -73,14 +75,14 @@ void Abstract_Simpleboot_Data_Provider::PT(const std::string &stamp,
 
   if(current_matrix_max_polynomial_degree
      != poly.degree() + (maxderivs - m - n))
-    MMA_PARSER_ERROR("inconsistent polynomial degree : prediction from stamp=",
-                     stamp, ", L=", L, ", m=", m, ", n=", n, " is ",
-                     poly.degree() + (maxderivs - m - n),
-                     ", while previous prediction is ", maxderivs);
+    RUNTIME_ERROR("inconsistent polynomial degree : prediction from stamp=",
+                  stamp, ", L=", L, ", m=", m, ", n=", n, " is ",
+                  poly.degree() + (maxderivs - m - n),
+                  ", while previous prediction is ", maxderivs);
 
   if(maxderivs < m + n)
-    MMA_PARSER_ERROR("incorrect maxderivs in the param file: maxderivs=",
-                     maxderivs);
+    RUNTIME_ERROR("incorrect maxderivs in the param file: maxderivs=",
+                  maxderivs);
 
   interval_transformation(poly.coefficients, a, b,
                           current_matrix_max_polynomial_degree);
@@ -152,4 +154,65 @@ Abstract_Simpleboot_Data_Provider::Pochhammer(const Boost_Float &alpha,
       result *= alpha + kk;
     }
   return result;
+}
+
+int Abstract_Simpleboot_Data_Provider::init_binomial_coeff(int N)
+{
+  if(N < binomial_cache_N)
+    return 0;
+  binomial_cache_N = N;
+  binomial_cache.resize(N + 1);
+  for(int m = 0; m <= N; m++)
+    {
+      binomial_cache[m].resize(m + 1);
+
+      mpz_class binomial_coeff = 1;
+      for(int n = 0; n <= m; n++)
+        {
+          // store Binomial[m,n]
+          binomial_cache[m][n] = binomial_coeff;
+
+          // Binomial[m,n+1]=Binomial[m,n] * (m-n)/(1+n)
+          binomial_coeff = (binomial_coeff * (m - n)) / (n + 1);
+        }
+    }
+  return 1;
+}
+
+mpz_class
+Abstract_Simpleboot_Data_Provider::binomial_coeff_cached(int m, int n)
+{
+  return binomial_cache[m][n];
+}
+
+void Abstract_Simpleboot_Data_Provider::interval_transformation(
+  std::vector<El::BigFloat> &coeff, const El::BigFloat &a,
+  const El::BigFloat &b, int max_degree)
+{
+  int N = coeff.size() - 1; // degree of the polynomial
+  int M = max_degree; // maximum degree of the polynomials in current matrix
+
+  std::vector<El::BigFloat> new_coefficients(M + 1, 0);
+
+  init_binomial_coeff(M);
+
+  for(int n = 0; n <= N; n++)
+    {
+      El::BigFloat a_pow = to_BigFloat(pow(to_Boost_Float(a), n));
+      El::BigFloat b_pow = 1;
+      for(int m = 0; m <= n; m++)
+        {
+          for(int k = 0; k <= M - n; k++)
+            {
+              new_coefficients[k + m].gmp_float
+                += coeff[n].gmp_float * a_pow.gmp_float * b_pow.gmp_float
+                   * binomial_coeff_cached(n, m)
+                   * binomial_coeff_cached(M - n, k);
+            }
+          a_pow = a_pow / a;
+          b_pow = b_pow * b;
+        }
+    }
+
+  coeff.assign(new_coefficients.begin(), new_coefficients.end());
 }
