@@ -7,6 +7,9 @@
 
 namespace fs = std::filesystem;
 
+Simpleboot_Parameters
+parse_simpleboot_parameter_file(const std::filesystem::path &param_file);
+
 PMP_File_Parse_Result
 read_json(const std::filesystem::path &input_path, bool should_parse_objective,
           bool should_parse_normalization,
@@ -23,10 +26,10 @@ read_json(const std::filesystem::path &input_path, bool should_parse_objective,
     [&](PMP_File_Parse_Result &&value) { result = std::move(value); });
 
   // TODO initialize from command-line input
-  const std::filesystem::path block_folder;
-  const std::vector<std::filesystem::path> input_files;
+  const std::filesystem::path params_file;
+  const auto params = parse_simpleboot_parameter_file(params_file);
   const auto simpleboot_provider
-    = std::make_shared<Simpleboot_Data_Provider>(block_folder, input_files);
+    = std::make_shared<Simpleboot_Data_Provider>(params);
 
   const auto context
     = std::make_shared<PMP_Simpleboot_Parsing_Context<Simpleboot_Data_Provider>>(

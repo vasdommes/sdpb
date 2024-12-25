@@ -71,8 +71,8 @@ void load_block_folder(
   std::map<std::pair<std::string, int>,
            std::vector<std::vector<std::vector<El::BigFloat>>>> &blockF);
 
-const char *parse_parameter_file(const char *begin, const char *end,
-                                 Simpleboot_Parameters &params)
+const char *parse_simpleboot_parameter_file(const char *begin, const char *end,
+                                            Simpleboot_Parameters &params)
 {
   const char *begin_item;
   const char *end_item;
@@ -130,7 +130,7 @@ const char *parse_parameter_file(const char *begin, const char *end,
       pstr = parse_MMA_check_op(begin_item, end_item, parser, '{');
       El::BigFloat var_value;
 
-      while(1)
+      while(true)
         {
           parser.parse_token(pstr, end_item, token);
           std::string var_name = AS_MMA_TOKEN(token, String);
@@ -175,7 +175,7 @@ const char *parse_parameter_file(const char *begin, const char *end,
 }
 
 Simpleboot_Parameters
-parse_parameter_file(const std::filesystem::path &param_file)
+parse_simpleboot_parameter_file(const std::filesystem::path &param_file)
 {
   Simpleboot_Parameters params;
 
@@ -195,7 +195,7 @@ parse_parameter_file(const std::filesystem::path &param_file)
       const char *begin(
         static_cast<const char *>(mapped_region.get_address())),
         *end(begin + mapped_region.get_size());
-      parse_parameter_file(begin, end, params);
+      parse_simpleboot_parameter_file(begin, end, params);
     }
   catch(std::exception &e)
     {
