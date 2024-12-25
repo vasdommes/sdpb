@@ -28,7 +28,8 @@ protected:
   {
     auto begin = string_value.c_str();
     auto end = begin + string_value.size();
-    return from_MMA_element<TFloat>(
-      context->expression_parser.parse(begin, end));
+    MMA_ELEMENT element;
+    context->expression_parser.parse_element(begin, end, element);
+    return from_MMA_element<TFloat>(element);
   }
 };

@@ -1,20 +1,5 @@
 #include "mathematica_parse_util.hxx"
 
-template <> inline El::BigFloat from_MMA_element(const MMA_ELEMENT &element)
-{
-  return AS_MMA_ELEMENT_Number(element);
-}
-
-template <> inline Boost_Float from_MMA_element(const MMA_ELEMENT &element)
-{
-  return to_Boost_Float(AS_MMA_ELEMENT_Number(element));
-}
-
-template <> inline Polynomial from_MMA_element(const MMA_ELEMENT &element)
-{
-  return AS_MMA_ELEMENT_Polynomial(element);
-}
-
 std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v)
 {
   switch(v.index())
@@ -46,5 +31,32 @@ std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v)
       break;
     default: LOGIC_ERROR(DEBUG_STRING(v.index()));
     }
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v)
+{
+  switch(v.index())
+    {
+    case MMA_TOKEN_Invalid: os << "[invalid]"; break;
+    case MMA_TOKEN_Integer:
+      os << "[Integer " << AS_MMA_TOKEN(v, Integer) << "]";
+      break;
+    case MMA_TOKEN_Real:
+      os << "[Float " << AS_MMA_TOKEN(v, Real) << "]";
+      break;
+    case MMA_TOKEN_Operator:
+      os << "[Operator " << AS_MMA_TOKEN(v, Operator) << "]";
+      break;
+    case MMA_TOKEN_Symbol:
+      os << "[Symbol " << AS_MMA_TOKEN(v, Symbol) << "]";
+      break;
+    case MMA_TOKEN_String:
+      os << "[String " << AS_MMA_TOKEN(v, String) << "]";
+      break;
+    default: break;
+    }
+
+  // std::visit([&os](auto &&arg) { os << arg; }, v);
   return os;
 }

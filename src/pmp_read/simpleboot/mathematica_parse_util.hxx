@@ -38,11 +38,24 @@ using MMA_ELEMENT = std::variant<std::monostate, MMA_EXPR, char>;
   std::get<MMA_EXPR_Polynomial>(std::get<MMA_ELEMENT_Expression>(var))
 #define SET_MMA_ELEMENT(var, value, T) var.emplace<MMA_ELEMENT_##T>(value)
 
+std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v);
+std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v);
+
 // Helper function used by Json_Simpleboot_Float_Parser and Json_Simpleboot_Polynomial_Parser.
 // We had to move from_MMA_element() outside of class
 // because C++ does not allow partial specialization for member functions
 template <class TResult>
 TResult from_MMA_element(const MMA_ELEMENT &element) = delete;
 
-std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v);
-
+template <> inline El::BigFloat from_MMA_element(const MMA_ELEMENT &element)
+{
+  return AS_MMA_ELEMENT_Number(element);
+}
+template <> inline Boost_Float from_MMA_element(const MMA_ELEMENT &element)
+{
+  return to_Boost_Float(AS_MMA_ELEMENT_Number(element));
+}
+template <> inline Polynomial from_MMA_element(const MMA_ELEMENT &element)
+{
+  return AS_MMA_ELEMENT_Polynomial(element);
+}
