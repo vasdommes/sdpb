@@ -1,10 +1,12 @@
 #pragma once
 
-#include "PMP_Simpleboot_Parsing_Context.hxx"
+#include "Mathematica_Simpleboot_Expression_Parser.hxx"
+#include "sdpb_util/json/Json_String_Element_Parser.hxx"
 
-struct PMP_Simpleboot_Parsing_Context;
+#include <memory>
 
-template <class TFloat>
+// Parses string with Mathematica expression to BigFloat/Boost_Float number.
+template <class TFloat, class TContext>
 class Json_Simpleboot_Float_Parser final
     : public Json_String_Element_Parser<TFloat>
 {
@@ -13,19 +15,20 @@ public:
 
   Json_Simpleboot_Float_Parser(
     bool skip, const std::function<void(value_type &&)> &on_parsed,
-    const std::function<void()> &on_skipped,
-    const std::shared_ptr<PMP_Simpleboot_Parsing_Context> &context)
+    const std::function<void()> &on_skipped, std::shared_ptr<TContext> context)
       : Json_String_Element_Parser<TFloat>(skip, on_parsed, on_skipped),
-        context(context)
+        context(std::move(context))
   {}
 
 private:
-  const std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
+  const std::shared_ptr<TContext> context;
 
 protected:
   TFloat from_string(const std::string &string_value) override
   {
-    RUNTIME_ERROR("TODO not implemented: parse Mathematica expression",
-                  DEBUG_STRING(string_value));
+    auto begin = string_value.c_str();
+    auto end = begin + string_value.size();
+    return from_MMA_element<TFloat>(
+      context->expression_parser.parse(begin, end));
   }
 };

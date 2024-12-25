@@ -1,5 +1,6 @@
 #include "pmp_read/read_json/Json_PMP_Parser.hxx"
 #include "pmp_read/simpleboot/PMP_Simpleboot_Parsing_Context.hxx"
+#include "pmp_read/simpleboot/Simpleboot_Data_Provider.hxx"
 
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/error/en.h>
@@ -21,11 +22,20 @@ read_json(const std::filesystem::path &input_path, bool should_parse_objective,
     should_parse_objective, should_parse_normalization, should_parse_matrix,
     [&](PMP_File_Parse_Result &&value) { result = std::move(value); });
 
-  auto context = std::make_shared<PMP_Simpleboot_Parsing_Context>();
-  Json_PMP_Parser<PMP_Simpleboot_Parsing_Context> parser_simpleboot(
-    should_parse_objective, should_parse_normalization, should_parse_matrix,
-    [&](PMP_File_Parse_Result &&value) { result = std::move(value); },
-    context);
+  // TODO initialize from command-line input
+  const std::filesystem::path block_folder;
+  const std::vector<std::filesystem::path> input_files;
+  const auto simpleboot_provider
+    = std::make_shared<Simpleboot_Data_Provider>(block_folder, input_files);
+
+  const auto context
+    = std::make_shared<PMP_Simpleboot_Parsing_Context<Simpleboot_Data_Provider>>(
+      simpleboot_provider);
+  Json_PMP_Parser<PMP_Simpleboot_Parsing_Context<Simpleboot_Data_Provider>>
+    parser_simpleboot(
+      should_parse_objective, should_parse_normalization, should_parse_matrix,
+      [&](PMP_File_Parse_Result &&value) { result = std::move(value); },
+      context);
 
   auto &parser = parser_default;
   // auto& parser = parser_simpleboot;

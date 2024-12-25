@@ -75,6 +75,8 @@ using MMA_ELEMENT = std::variant<std::monostate, MMA_EXPR, char>;
 
 std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v);
 
+const char *skip_space_from_left(const char *b, const char *e);
+
 ////////////////// built-in function and symbols ////////////////////////
 
 namespace param
@@ -121,9 +123,6 @@ const char *parse_MMA_get_op(const char *begin, const char *end,
 
 const char *
 parse_MMA_element(const char *begin, const char *end, MMA_ELEMENT &result);
-
-const char *
-parse_MMA_expr(const char *begin, const char *end, MMA_ELEMENT &result);
 
 // for my purpose now, I only need
 // P[stamp, L, m, n, shift] : block derivative polynomial

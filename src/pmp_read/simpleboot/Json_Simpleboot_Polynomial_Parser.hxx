@@ -1,28 +1,35 @@
 #pragma once
 
-#include "PMP_Simpleboot_Parsing_Context.hxx"
+#include "Json_Simpleboot_Float_Parser.hxx"
+#include "pmp_read/read_json/Json_Polynomial_Parser.hxx"
 
-struct PMP_Simpleboot_Parsing_Context;
+#include <memory>
+#include <string>
 
+// Each polynomial is encoded either as a string (Mathematica expression),
+// or as a list of string (each string is a Mathematica expression or number)
+template <class TContext>
 class Json_Simpleboot_Polynomial_Parser final
-    : public Json_Polynomial_Parser<Json_Simpleboot_Float_Parser<El::BigFloat>>
+    : public Json_Polynomial_Parser<
+        Json_Simpleboot_Float_Parser<El::BigFloat, TContext>>
 {
   using SizeType = rapidjson::SizeType;
   using Ch = rapidjson::UTF8<>::Ch;
 
 public:
   using value_type = Polynomial;
+  using base_type = Json_Polynomial_Parser<
+    Json_Simpleboot_Float_Parser<El::BigFloat, TContext>>;
 
   Json_Simpleboot_Polynomial_Parser(
     const bool skip, const std::function<void(Polynomial &&)> &on_parsed,
     const std::function<void()> &on_skipped,
-    const std::shared_ptr<PMP_Simpleboot_Parsing_Context> &context)
-      : Json_Polynomial_Parser(skip, on_parsed, on_skipped, context),
-        context(context)
+    const std::shared_ptr<TContext> &context)
+      : base_type(skip, on_parsed, on_skipped, context), context(context)
   {}
 
 private:
-  const std::shared_ptr<PMP_Simpleboot_Parsing_Context> context;
+  const std::shared_ptr<TContext> context;
 
 public:
   // This code is copied from Json_String_Element_Parser.
@@ -55,7 +62,9 @@ public:
 
   Polynomial from_string(const std::string &string_value)
   {
-    RUNTIME_ERROR("TODO not implemented: parse Mathematica expression",
-                  DEBUG_STRING(string_value));
+    auto begin = string_value.c_str();
+    auto end = begin + string_value.size();
+    return from_MMA_element<Polynomial>(
+      context->expression_parser.parse(begin, end));
   }
 };
