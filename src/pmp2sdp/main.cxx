@@ -3,6 +3,7 @@
 #include "Dual_Constraint_Group.hxx"
 #include "write_sdp.hxx"
 #include "pmp_read/pmp_read.hxx"
+#include "pmp_read/simpleboot/Simpleboot_Parameters.hxx"
 #include "sdpb_util/Verbosity.hxx"
 #include "sdpb_util/Timers/Timers.hxx"
 
@@ -12,6 +13,9 @@
 
 namespace fs = std::filesystem;
 namespace po = boost::program_options;
+
+Simpleboot_Parameters
+parse_simpleboot_parameter_file(const std::filesystem::path &param_file);
 
 int main(int argc, char **argv)
 {
@@ -38,8 +42,28 @@ int main(int argc, char **argv)
       Timers timers(env, parameters.verbosity);
       Scoped_Timer timer(timers, "pmp2sdp");
 
-      auto pmp = read_polynomial_matrix_program(env, parameters.input_file,
-                                                parameters.verbosity, timers);
+      std::optional<Simpleboot_Parameters> simpleboot_parameters;
+      std::vector<fs::path> input_files;
+      if(parameters.simpleboot_param_file.empty())
+        {
+          input_files = {parameters.input_file};
+        }
+      else
+        {
+          simpleboot_parameters = parse_simpleboot_parameter_file(
+            parameters.simpleboot_param_file);
+          input_files = simpleboot_parameters->input_files;
+          if(!parameters.input_file.empty() && El::mpi::Rank() == 0)
+            {
+              PRINT_WARNING("--input=", parameters.input_file,
+                            " will be ignored, list of input files is read "
+                            "from parameter file --simpleboot=",
+                            parameters.simpleboot_param_file);
+            }
+        }
+
+      auto pmp = read_polynomial_matrix_program(
+        env, input_files, parameters.verbosity, timers, simpleboot_parameters);
 
       Output_SDP sdp(pmp, parameters.command_arguments, timers);
       write_sdp(parameters.output_path, sdp, pmp, parameters.output_format,

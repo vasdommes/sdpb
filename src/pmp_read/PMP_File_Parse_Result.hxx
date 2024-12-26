@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pmp/Polynomial_Vector_Matrix.hxx"
+#include "simpleboot/Simpleboot_Parameters.hxx"
 
 #include <El.hpp>
 
@@ -29,7 +30,8 @@ struct PMP_File_Parse_Result
   static PMP_File_Parse_Result
   read(const std::filesystem::path &input_path, bool should_parse_objective,
        bool should_parse_normalization,
-       const std::function<bool(size_t matrix_index)> &should_parse_matrix);
+       const std::function<bool(size_t matrix_index)> &should_parse_matrix,
+       const std::optional<Simpleboot_Parameters> &simpleboot_parameters);
 
   // Allow moving and prevent accidential copying
 

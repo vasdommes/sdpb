@@ -13,41 +13,42 @@ parse_simpleboot_parameter_file(const std::filesystem::path &param_file);
 PMP_File_Parse_Result
 read_json(const std::filesystem::path &input_path, bool should_parse_objective,
           bool should_parse_normalization,
-          const std::function<bool(size_t matrix_index)> &should_parse_matrix)
+          const std::function<bool(size_t matrix_index)> &should_parse_matrix,
+          const std::optional<Simpleboot_Parameters> &simpleboot_parameters)
 {
   std::ifstream input_file(input_path);
   rapidjson::IStreamWrapper wrapper(input_file);
   PMP_File_Parse_Result result;
 
-  // TODO here we create two parsers to test compilation
-
-  Json_PMP_Parser<PMP_Default_Parsing_Context> parser_default(
-    should_parse_objective, should_parse_normalization, should_parse_matrix,
-    [&](PMP_File_Parse_Result &&value) { result = std::move(value); });
-
-  // TODO initialize from command-line input
-  const std::filesystem::path params_file;
-  const auto params = parse_simpleboot_parameter_file(params_file);
-  const auto simpleboot_provider
-    = std::make_shared<Simpleboot_Data_Provider>(params);
-
-  const auto context
-    = std::make_shared<PMP_Simpleboot_Parsing_Context<Simpleboot_Data_Provider>>(
-      simpleboot_provider);
-  Json_PMP_Parser<PMP_Simpleboot_Parsing_Context<Simpleboot_Data_Provider>>
-    parser_simpleboot(
-      should_parse_objective, should_parse_normalization, should_parse_matrix,
-      [&](PMP_File_Parse_Result &&value) { result = std::move(value); },
-      context);
-
-  auto &parser = parser_default;
-  // auto& parser = parser_simpleboot;
-
   rapidjson::ParseResult res;
   try
     {
       rapidjson::Reader reader;
-      res = reader.Parse(wrapper, parser);
+      if(simpleboot_parameters.has_value())
+        {
+          const auto provider = std::make_shared<Simpleboot_Data_Provider>(
+            simpleboot_parameters.value());
+
+          const auto context
+            = std::make_shared<PMP_Simpleboot_Parsing_Context<>>(provider);
+
+          Json_PMP_Parser<PMP_Simpleboot_Parsing_Context<>> parser(
+            should_parse_objective, should_parse_normalization,
+            should_parse_matrix,
+            [&](PMP_File_Parse_Result &&value) { result = std::move(value); },
+            context);
+
+          res = reader.Parse(wrapper, parser);
+        }
+      else
+        {
+          Json_PMP_Parser parser(
+            should_parse_objective, should_parse_normalization,
+            should_parse_matrix,
+            [&](PMP_File_Parse_Result &&value) { result = std::move(value); });
+
+          res = reader.Parse(wrapper, parser);
+        }
     }
   catch(std::exception &e)
     {

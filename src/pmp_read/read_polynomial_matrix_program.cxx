@@ -4,6 +4,7 @@
 #include "sdpb_util/assert.hxx"
 #include "sdpb_util/block_mapping/compute_block_grid_mapping.hxx"
 #include "sdpb_util/block_mapping/create_mpi_block_mapping_groups.hxx"
+#include "simpleboot/PMP_Simpleboot_Parsing_Context.hxx"
 
 namespace fs = std::filesystem;
 
@@ -117,10 +118,10 @@ read_polynomial_matrix_program(const Environment &env,
 // TODO: since IO is often a bottleneck, we can reduce it:
 //   root of each group copies file content to a shared memory window,
 //   and other processes read it.
-Polynomial_Matrix_Program
-read_polynomial_matrix_program(const Environment &env,
-                               const std::vector<fs::path> &input_files,
-                               const Verbosity &verbosity, Timers &timers)
+Polynomial_Matrix_Program read_polynomial_matrix_program(
+  const Environment &env, const std::vector<fs::path> &input_files,
+  const Verbosity &verbosity, Timers &timers,
+  const std::optional<Simpleboot_Parameters> &simpleboot_parameters)
 {
   Scoped_Timer timer(timers, "read_pmp");
 
@@ -138,6 +139,7 @@ read_polynomial_matrix_program(const Environment &env,
 
   const auto all_files = collect_files_expanding_nsv(input_files);
   const size_t num_files = all_files.size();
+  ASSERT(num_files > 0, "Number of input files must be greater than 0");
 
   // Parse files
 
@@ -173,7 +175,7 @@ read_polynomial_matrix_program(const Environment &env,
 
         auto file_parse_result = PMP_File_Parse_Result::read(
           file, should_parse_objective, should_parse_normalization,
-          should_parse_matrix);
+          should_parse_matrix, simpleboot_parameters);
 
         num_matrices_in_group += file_parse_result.num_matrices;
 

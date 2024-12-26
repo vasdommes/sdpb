@@ -17,8 +17,12 @@ Pmp2sdp_Parameters::Pmp2sdp_Parameters(int argc, char **argv)
   po::options_description options("Basic options");
   options.add_options()("help,h", "Show this helpful message.");
   options.add_options()(
-    "input,i", po::value<fs::path>(&input_file)->required(),
+    "input,i", po::value<fs::path>(&input_file),
     "Mathematica, JSON, XML or NSV file with SDP definition");
+  // Simpleboot alternative to input_file. TODO rename?
+  options.add_options()("simpleboot",
+                        po::value<fs::path>(&simpleboot_param_file),
+                        "*.m file that defines variables used by simpleboot");
   options.add_options()("output,o",
                         po::value<fs::path>(&output_path)->required(),
                         "Directory to place output");
@@ -65,10 +69,27 @@ Pmp2sdp_Parameters::Pmp2sdp_Parameters(int argc, char **argv)
 
       po::notify(variables_map);
 
-      ASSERT(fs::exists(input_file),
-             "Input file does not exist: ", input_file);
-      ASSERT(!fs::is_directory(input_file) && input_file != ".",
-             "Input file is a directory, not a file:", input_file);
+      ASSERT(variables_map.count("simpleboot") + variables_map.count("input")
+               == 1,
+             "Either --input or --simpleboot option should be specified");
+
+      if(variables_map.count("input") > 0)
+        {
+          ASSERT(fs::exists(input_file),
+                 "Input file does not exist: ", input_file);
+          ASSERT(!fs::is_directory(input_file) && input_file != ".",
+                 "Input file is a directory, not a file:", input_file);
+        }
+      if(variables_map.count("simpleboot") > 0)
+        {
+          ASSERT(fs::exists(simpleboot_param_file),
+                 "Simpleboot parameters file does not exist: ",
+                 simpleboot_param_file);
+          ASSERT(!fs::is_directory(simpleboot_param_file)
+                   && simpleboot_param_file != ".",
+                 "Simpleboot parameters file is a directory, not a file:",
+                 simpleboot_param_file);
+        }
     }
   catch(po::error &e)
     {
@@ -85,6 +106,7 @@ boost::property_tree::ptree to_property_tree(const Pmp2sdp_Parameters &p)
   boost::property_tree::ptree result;
 
   result.put("input", p.input_file.string());
+  result.put("parameter", p.simpleboot_param_file.string());
   result.put("output", p.output_path.string());
   result.put("precision", p.precision);
   result.put("outputFormat", p.output_format);
