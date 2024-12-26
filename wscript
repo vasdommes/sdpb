@@ -193,10 +193,11 @@ def build(bld):
                         'src/pmp_read/read_xml/Xml_Parser/on_start_element.cxx',
                         'src/pmp_read/read_xml/Xml_Parser/on_end_element.cxx',
                         'src/pmp_read/read_xml/Xml_Parser/on_characters.cxx',
-                        'src/pmp_read/simpleboot/parse_MMA_expr.cxx',
-                        'src/pmp_read/simpleboot/parse_parameter_file.cxx',
-                        'src/pmp_read/simpleboot/simpleboot.cxx',
-                        'src/pmp_read/simpleboot/test.cxx',
+                        'src/pmp_read/simpleboot/Abstract_Simpleboot_Data_Provider.cxx',
+                        'src/pmp_read/simpleboot/mathematica_parse_util.cxx',
+                        'src/pmp_read/simpleboot/Mathematica_Parser.cxx',
+                        'src/pmp_read/simpleboot/parse_simpleboot_parameter_file.cxx',
+                        'src/pmp_read/simpleboot/Simpleboot_Data_Provider.cxx',
                         ]
 
     bld.stlib(source=pmp_read_sources,
