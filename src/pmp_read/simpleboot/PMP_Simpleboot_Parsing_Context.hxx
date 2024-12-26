@@ -4,13 +4,13 @@
 
 #include "Json_Simpleboot_Float_Parser.hxx"
 #include "Json_Simpleboot_Polynomial_Parser.hxx"
-// #include "Simpleboot_Data_Provider.hxx"
+#include "Simpleboot_Data_Provider.hxx"
 
 template <class TFloat, class TExpressionParser>
 class Json_Simpleboot_Float_Parser;
 template <class TExpressionParser> class Json_Simpleboot_Polynomial_Parser;
 
-template <class TSimpleboot_Data_Provider>
+template <class TSimpleboot_Data_Provider = Simpleboot_Data_Provider>
 struct PMP_Simpleboot_Parsing_Context
 {
 public:

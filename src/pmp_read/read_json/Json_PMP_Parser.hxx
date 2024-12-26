@@ -12,7 +12,7 @@ struct PMP_Default_Parsing_Context
   using Polynomial_Parser = Json_Polynomial_Parser<Float_Parser<El::BigFloat>>;
 };
 
-template <class TContext>
+template <class TContext = PMP_Default_Parsing_Context>
 class Json_PMP_Parser final
     : public Abstract_Json_Object_Parser<PMP_File_Parse_Result>
 {
