@@ -6,131 +6,93 @@
 #include <boost/math/tools/polynomial.hpp>
 #include <boost/serialization/vector.hpp>
 
-namespace boost
+// TODO: El::BigFloat serialization is already specified "sdpb_util/boost_serialization.hxx".
+// Here we use different serialization parameters.
+// Ideally, we should use only boost_serialization.hxx.
+// NB: this requires to change the code that generates block files.
+
+namespace boost::serialization
 {
-  namespace serialization
+  template <class Archive>
+  void save(Archive &ar, El::BigFloat const &f,
+            const boost::serialization::version_type &)
   {
-    template <class Archive>
-    void save(Archive &ar, El::BigFloat const &f,
-              const boost::serialization::version_type &)
-    {
-      std::vector<uint8_t> local_array(f.SerializedSize());
-      f.Serialize(local_array.data());
-      ar & local_array;
-    }
+    std::vector<uint8_t> local_array(f.SerializedSize());
+    f.Serialize(local_array.data());
+    ar & local_array;
+  }
 
-    template <class Archive>
-    void load(Archive &ar, El::BigFloat &f,
-              const boost::serialization::version_type &)
-    {
-      std::vector<uint8_t> local_array(f.SerializedSize());
-      ar & local_array;
-      f.Deserialize(local_array.data());
-    }
-
-  } // namespace serialization
-} // namespace boost
+  template <class Archive>
+  void load(Archive &ar, El::BigFloat &f,
+            const boost::serialization::version_type &)
+  {
+    std::vector<uint8_t> local_array(f.SerializedSize());
+    ar & local_array;
+    f.Deserialize(local_array.data());
+  }
+} // namespace boost::serialization
 
 BOOST_SERIALIZATION_SPLIT_FREE(El::BigFloat)
 
-static auto const boost_archive_flags
+static constexpr auto boost_archive_flags
   = boost::archive::no_header | boost::archive::no_tracking;
+
+namespace fs = std::filesystem;
+using block_type = std::vector<std::vector<std::vector<El::BigFloat>>>;
+
+namespace
+{
+  block_type read_block_file(const fs::path &file)
+  {
+    std::vector<std::vector<std::vector<El::BigFloat>>> zzb_derivs_conv_El;
+    std::ifstream ifs(file);
+    ASSERT(ifs.good(), "Failed to open block file: ", file);
+    boost::archive::binary_iarchive ia(ifs, boost_archive_flags);
+    ia & zzb_derivs_conv_El;
+    return zzb_derivs_conv_El;
+  }
+}
 
 Simpleboot_Data_Provider::Simpleboot_Data_Provider(
   const Simpleboot_Parameters &parameters)
     : Abstract_Simpleboot_Data_Provider(parameters)
-{
-  load_block_folder();
-}
+{}
 
-Polynomial Simpleboot_Data_Provider::blockF_lookup(const std::string &stamp,
-                                                   int L, int m, int n)
+Polynomial
+Simpleboot_Data_Provider::blockF_lookup(const std::string &stamp, const int L,
+                                        const int m, const int n)
 {
-  auto pblock = blockF.find(std::make_pair(stamp, L));
-  if(pblock == blockF.end())
-    {
-      load_block_folder(stamp, L);
-      pblock = blockF.find(std::make_pair(stamp, L));
-    }
-
-  if(pblock->second.size() < m + 1 || pblock->second.at(m).size() < n + 1)
+  const auto &block = get_blockF(stamp, L);
+  if(block.size() < m + 1 || block.at(m).size() < n + 1)
     RUNTIME_ERROR("can't find polynomial for stamp=", stamp, " L=", L,
-                  " m=", m, " n=", n);
+                  " m=", m, " n=", n, DEBUG_STRING(block.size()),
+                  DEBUG_STRING(block.at(m).size()));
 
   Polynomial polynomial;
-  polynomial.coefficients = pblock->second.at(m).at(n);
+  polynomial.coefficients = block.at(m).at(n);
   return polynomial;
 }
-void Simpleboot_Data_Provider::load_block_folder()
+
+// To prevent extra copying, we return const reference to a block stored in cache.
+// Since the reference is used only locally by blockF_lookup, it remains alive.
+const Simpleboot_Data_Provider::block_type &
+Simpleboot_Data_Provider::get_blockF(const std::string &stamp, const int spin)
 {
   namespace fs = std::filesystem;
 
-  El::Output("scan blocks...");
+  const auto key = std::make_pair(stamp, spin);
+  {
+    const auto it = blockF_cache.find(key);
+    if(it != blockF_cache.end())
+      return it->second;
+  }
 
-  std::vector<std::vector<std::vector<El::BigFloat>>> zzb_derivs_conv_El;
+  const fs::path file
+    = block_folder / build_string(stamp, "-L", spin, ".block");
 
-  for(auto const &file : fs::recursive_directory_iterator(block_folder))
-    {
-      if(fs::is_regular_file(file)
-         && file.path().extension() == std::string(".block"))
-        {
-          const std::string filename = file.path().filename().string();
-          size_t barL = filename.find("-L");
-          if(barL == std::string::npos)
-            RUNTIME_ERROR("Load block error : invalid block file name : ",
-                          filename);
-          const std::string stamp = filename.substr(0, barL);
-          barL += 2;
-          size_t dot = filename.find(".", barL);
-          if(dot == std::string::npos)
-            RUNTIME_ERROR("Load block error : invalid block file name : ",
-                          filename);
-          int spin = std::stoi(filename.substr(barL, dot));
+  const auto [it, res] = blockF_cache.emplace(key, read_block_file(file));
+  ASSERT(res, "Failed to add block to cache: ", DEBUG_STRING(stamp),
+         DEBUG_STRING(spin));
 
-          El::Output("load block with stamp = ", stamp, " spin = ", spin);
-
-          std::ifstream ifs(file.path());
-          boost::archive::binary_iarchive ia(ifs, boost_archive_flags);
-          ia & zzb_derivs_conv_El;
-
-          blockF.emplace(std::make_pair(stamp, spin), zzb_derivs_conv_El);
-        }
-    }
-
-  El::Output("blocks loaded");
-
-  // for(const auto &[key, value] : blockF)
-  //   El::Output("find block with stamp=", key.first, " spin=", key.second,
-  //              " max_m=", value.size() - 1);
-}
-
-void Simpleboot_Data_Provider::load_block_folder(const std::string &stamp,
-                                                 int spin)
-{
-  namespace fs = std::filesystem;
-
-  std::vector<std::vector<std::vector<El::BigFloat>>> zzb_derivs_conv_El;
-
-  auto pblock = blockF.find(std::make_pair(stamp, spin));
-  if(pblock != blockF.end())
-    RUNTIME_ERROR("load_block_folder error : ", stamp, "-L", spin, ".block",
-                  " already exist.");
-
-  std::stringstream path_str;
-  path_str << block_folder << "/" << stamp << "-L" << spin << ".block";
-
-  const fs::path file(path_str.str());
-
-  if(!fs::is_regular_file(file)) //exists(file) &&
-    RUNTIME_ERROR("load_block_folder error : ", stamp, "-L", spin, ".block",
-                  " is missing.");
-
-  std::ifstream ifs(file);
-  boost::archive::binary_iarchive ia(ifs, boost_archive_flags);
-  ia & zzb_derivs_conv_El;
-
-  blockF.emplace(std::make_pair(stamp, spin), zzb_derivs_conv_El);
-
-  El::Output("Rank=", El::mpi::Rank(), " : load block with stamp = ", stamp,
-             " spin = ", spin);
+  return it->second;
 }

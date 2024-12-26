@@ -2,7 +2,6 @@
 
 #include "Abstract_Simpleboot_Data_Provider.hxx"
 #include "mathematica_parse_util.hxx"
-#include "sdpb_util/Boost_Float.hxx"
 
 #include <filesystem>
 
@@ -16,13 +15,13 @@ protected:
   blockF_lookup(const std::string &stamp, int L, int m, int n) override;
 
 private:
+  // (stamp, spin)
+  using block_key_type = std::pair<std::string, int>;
+  using block_type = std::vector<std::vector<std::vector<El::BigFloat>>>;
+
   std::filesystem::path block_folder;
-  std::map<std::pair<std::string, int>,
-           std::vector<std::vector<std::vector<El::BigFloat>>>>
-    blockF;
+  std::map<block_key_type, block_type> blockF_cache;
 
 private:
-  void load_block_folder();
-  // TODO rename?
-  void load_block_folder(const std::string &stamp, int spin);
+  const block_type &get_blockF(const std::string &stamp, int spin);
 };
