@@ -1,6 +1,19 @@
 #include "Abstract_Simpleboot_Data_Provider.hxx"
-
 #include "mathematica_parse_util.hxx"
+#include "sdpb_util/Boost_Float.hxx"
+
+namespace
+{
+  Boost_Float Pochhammer(const Boost_Float &alpha, const int64_t &n)
+  {
+    Boost_Float result(1);
+    for(int64_t kk = 0; kk < n; ++kk)
+      {
+        result *= alpha + kk;
+      }
+    return result;
+  }
+}
 
 // (-1)^(m + n)*2^(1 + m + n - 2*x)*Poch[1 - m + x, m]*Poch[1 - n + x, n]
 void Abstract_Simpleboot_Data_Provider::F0(const El::BigFloat &x, const int m,
@@ -82,7 +95,7 @@ void Abstract_Simpleboot_Data_Provider::PT(const std::string &stamp,
 
   if(maxderivs < m + n)
     RUNTIME_ERROR("incorrect maxderivs in the param file: maxderivs=",
-                  maxderivs);
+                  maxderivs, DEBUG_STRING(m), DEBUG_STRING(n));
 
   interval_transformation(poly.coefficients, a, b,
                           current_matrix_max_polynomial_degree);
@@ -90,8 +103,9 @@ void Abstract_Simpleboot_Data_Provider::PT(const std::string &stamp,
   result = std::move(poly);
 }
 
-void Abstract_Simpleboot_Data_Provider::P(const std::string &stamp, int L,
-                                          int m, int n,
+void Abstract_Simpleboot_Data_Provider::P(const std::string &stamp,
+                                          const int L, const int m,
+                                          const int n,
                                           const El::BigFloat &shift,
                                           MMA_ELEMENT &result)
 {
@@ -105,7 +119,8 @@ void Abstract_Simpleboot_Data_Provider::P(const std::string &stamp, int L,
 }
 
 El::BigFloat
-Abstract_Simpleboot_Data_Provider::Fprefactor(int L, const El::BigFloat &x)
+Abstract_Simpleboot_Data_Provider::Fprefactor(const int L,
+                                              const El::BigFloat &x) const
 {
   const auto &order = kappa;
   El::BigFloat denominator = 1;
@@ -125,7 +140,8 @@ Abstract_Simpleboot_Data_Provider::Fprefactor(int L, const El::BigFloat &x)
 }
 
 El::BigFloat
-Abstract_Simpleboot_Data_Provider::FSprefactor(int L, const El::BigFloat &x)
+Abstract_Simpleboot_Data_Provider::FSprefactor(const int L,
+                                               const El::BigFloat &x) const
 {
   const auto &order = kappa;
   El::BigFloat denominator = 1;
@@ -144,22 +160,10 @@ Abstract_Simpleboot_Data_Provider::FSprefactor(int L, const El::BigFloat &x)
   return numerator_BigFloat / denominator;
 }
 
-Boost_Float
-Abstract_Simpleboot_Data_Provider::Pochhammer(const Boost_Float &alpha,
-                                              const int64_t &n)
-{
-  Boost_Float result(1);
-  for(int64_t kk = 0; kk < n; ++kk)
-    {
-      result *= alpha + kk;
-    }
-  return result;
-}
-
-int Abstract_Simpleboot_Data_Provider::init_binomial_coeff(int N)
+void Abstract_Simpleboot_Data_Provider::init_binomial_coeff(const int N)
 {
   if(N < binomial_cache_N)
-    return 0;
+    return;
   binomial_cache_N = N;
   binomial_cache.resize(N + 1);
   for(int m = 0; m <= N; m++)
@@ -176,18 +180,17 @@ int Abstract_Simpleboot_Data_Provider::init_binomial_coeff(int N)
           binomial_coeff = (binomial_coeff * (m - n)) / (n + 1);
         }
     }
-  return 1;
 }
 
-mpz_class
-Abstract_Simpleboot_Data_Provider::binomial_coeff_cached(int m, int n)
+mpz_class Abstract_Simpleboot_Data_Provider::binomial_coeff_cached(const int m,
+                                                                   const int n)
 {
-  return binomial_cache[m][n];
+  return binomial_cache.at(m).at(n);
 }
 
 void Abstract_Simpleboot_Data_Provider::interval_transformation(
   std::vector<El::BigFloat> &coeff, const El::BigFloat &a,
-  const El::BigFloat &b, int max_degree)
+  const El::BigFloat &b, const int max_degree)
 {
   int N = coeff.size() - 1; // degree of the polynomial
   int M = max_degree; // maximum degree of the polynomials in current matrix
