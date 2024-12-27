@@ -147,7 +147,7 @@ public:
         return pstr;
       }
 
-    MMA_PARSER_ERROR("parse_MMA_function error : unsupported ",
+    RUNTIME_ERROR("parse_MMA_function error : unsupported ",
                      DEBUG_STRING(name), " \n");
   }
 
@@ -155,7 +155,7 @@ public:
   {
     auto pvar = data_provider->var_map.find(name);
     if(pvar == data_provider->var_map.end())
-      MMA_PARSER_ERROR("can't find symbol ", name);
+      RUNTIME_ERROR("can't find symbol ", name);
 
     SET_MMA_ELEMENT(result, pvar->second, Expression);
   }

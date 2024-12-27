@@ -1,5 +1,7 @@
 #include "Mathematica_Parser.hxx"
 
+#include "sdpb_util/assert.hxx"
+
 const char *
 Mathematica_Parser::parse_element(const char *begin, const char *end,
                                   MMA_ELEMENT &result)
@@ -24,17 +26,24 @@ Mathematica_Parser::parse_MMA_function(const std::string &name,
                                        const char *begin, const char *end,
                                        MMA_ELEMENT &result)
 {
-  MMA_PARSER_ERROR("parse_MMA_function() not implemented");
+  RUNTIME_ERROR("parse_MMA_function() not implemented");
 }
 void Mathematica_Parser::parse_MMA_symbol(const std::string &name,
                                           MMA_ELEMENT &result)
 {
-  MMA_PARSER_ERROR("parse_MMA_symbol() not implemented");
+  RUNTIME_ERROR("parse_MMA_symbol() not implemented");
 }
 void Mathematica_Parser::reset(const char *begin, const char *end)
 {
-  ptr_MMA_begin = begin;
   ptr_MMA_current = begin;
+}
+std::string
+Mathematica_Parser::short_string(const char *begin, const char *end,
+                                 size_t max_length)
+{
+  if(end - begin > max_length)
+    end = begin + max_length;
+  return std::string(begin, end);
 }
 const char *
 Mathematica_Parser::skip_space_from_left(const char *begin, const char *end)
@@ -150,9 +159,9 @@ Mathematica_Parser::parse_get_token(const char *begin, const char *end,
   // handle "\\\n" case
   if(*p == '\\' && *(p + 1) == '\n')
     {
-      RUNTIME_ERROR("the code shouldn't reach here: ", std::string(p, p + 20));
+      RUNTIME_ERROR("the code shouldn't reach here: ", short_string(p, end));
     }
-  RUNTIME_ERROR("Unrecognizable expression: ", std::string(p, p + 10));
+  RUNTIME_ERROR("Unrecognizable expression: ", short_string(p, end));
 }
 const char *
 Mathematica_Parser::parse_MMA_check_op(const char *begin, const char *end,
@@ -161,8 +170,8 @@ Mathematica_Parser::parse_MMA_check_op(const char *begin, const char *end,
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator
      || AS_MMA_TOKEN(token, Operator) != op)
-    MMA_PARSER_ERROR("parse_MMA_check_op error : expect ", op, ", but I got ",
-                     token, " from text ", std::string(begin, 20));
+    RUNTIME_ERROR("parse_MMA_check_op error : expect ", op, ", but I got ",
+                  token, " from text ", short_string(begin, end));
   return pstr;
 }
 const char *
@@ -171,9 +180,9 @@ Mathematica_Parser::parse_MMA_token_as_int(const char *begin, const char *end,
 {
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Integer)
-    MMA_PARSER_ERROR(
+    RUNTIME_ERROR(
       "parse_MMA_get_token_as_int error : expect integer, but I got ", token,
-      " from text ", std::string(begin, 20));
+      " from text ", short_string(begin, end));
   int_num = AS_MMA_TOKEN(token, Integer);
   return pstr;
 }
@@ -186,8 +195,8 @@ const char *Mathematica_Parser::parse_MMA_expr_as_number(const char *begin,
 
   if(element.index() != MMA_ELEMENT_Expression
      || AS_MMA_ELEMENT(element, Expression).index() != MMA_EXPR_Number)
-    MMA_PARSER_ERROR("Expected number at : '", std::string(begin, 10),
-                     "' but got ", element);
+    RUNTIME_ERROR("Expected number at : '", short_string(begin, end),
+                  "' but got ", element);
 
   result = AS_MMA_ELEMENT_Number(element);
   return pstr;
@@ -228,9 +237,9 @@ Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
 
               if(token_next.index() != MMA_TOKEN_Operator
                  || AS_MMA_TOKEN(token_next, Operator) != ')')
-                MMA_PARSER_ERROR("Expected ')' at '",
-                                 std::string(pstr - 1, pstr + 3), "' but got ",
-                                 token_next);
+                RUNTIME_ERROR("Expected ')' at '",
+                              short_string(pstr - 1, pstr + 3), "' but got ",
+                              token_next);
 
               return pstr;
             }
@@ -246,8 +255,8 @@ Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
             return pstr;
 
           default:
-            MMA_PARSER_ERROR("Unexpected operator : ", op, " before ",
-                             std::string(pstr, pstr + 10));
+            RUNTIME_ERROR("Unexpected operator : ", op, " before ",
+                          short_string(pstr, end));
             break;
           }
       }
@@ -267,8 +276,8 @@ Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
 
     case MMA_TOKEN_String:
     default:
-      MMA_PARSER_ERROR("Unexpected token : ", token, " before ",
-                       std::string(pstr, pstr + 10));
+      RUNTIME_ERROR("Unexpected token : ", token, " before ",
+                    short_string(pstr, end));
       break;
     }
   return begin;
@@ -281,8 +290,8 @@ Mathematica_Parser::parse_MMA_element_as_expression(const char *begin,
   const char *pstr = parse_MMA_element(begin, end, result);
 
   if(result.index() != MMA_ELEMENT_Expression)
-    MMA_PARSER_ERROR("Expecting expression at : '", std::string(begin, 10),
-                     "' but got ", result);
+    RUNTIME_ERROR("Expecting expression at : '", short_string(begin, end),
+                  "' but got ", result);
   return pstr;
 }
 bool Mathematica_Parser::parse_MMA_expr_delimitersQ(const MMA_ELEMENT &elmt)
@@ -322,7 +331,7 @@ Mathematica_Parser::parse_MMA_expr_list(const char *begin, const char *end,
             chain.push_back(std::move(elmt));
             break;
           }
-        default: MMA_PARSER_ERROR("parse_MMA_expr error 1st op = ", op); break;
+        default: RUNTIME_ERROR("parse_MMA_expr error 1st op = ", op); break;
         }
     }
   else
@@ -359,14 +368,14 @@ Mathematica_Parser::parse_MMA_expr_list(const char *begin, const char *end,
           continue;
         }
 
-      MMA_PARSER_ERROR("parse_MMA_expr_Times error : illegal element : ", elmt,
-                       " after ", chain.back(), " before '",
-                       std::string(pstr, 10), "'");
+      RUNTIME_ERROR("parse_MMA_expr_Times error : illegal element : ", elmt,
+                    " after ", chain.back(), " before '",
+                    short_string(pstr, end), "'");
     }
 
   return pstr;
 }
-void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2) const
+void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -393,11 +402,10 @@ void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2) const
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_add unexpected error : e1.index() = ",
-                   e1.index(), " e2.index() = ", e2.index());
+  RUNTIME_ERROR("parse_MMA_expr_add unexpected error : e1.index() = ",
+                e1.index(), " e2.index() = ", e2.index());
 }
-void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1,
-                                                 MMA_EXPR &e2) const
+void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -425,11 +433,10 @@ void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1,
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = ",
-                   e1.index(), " e2.index() = ", e2.index());
+  RUNTIME_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = ",
+                e1.index(), " e2.index() = ", e2.index());
 }
-void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1,
-                                                 MMA_EXPR &e2) const
+void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -450,11 +457,11 @@ void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1,
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = ",
-                   e1.index(), " e2.index() = ", e2.index());
+  RUNTIME_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = ",
+                e1.index(), " e2.index() = ", e2.index());
 }
 void Mathematica_Parser::parse_MMA_expr_divide(MMA_EXPR &e1,
-                                               const MMA_EXPR &e2) const
+                                               const MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -468,11 +475,10 @@ void Mathematica_Parser::parse_MMA_expr_divide(MMA_EXPR &e1,
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_divide unexpected error : e1.index() = ",
-                   e1.index(), " e2.index() = ", e2.index());
+  RUNTIME_ERROR("parse_MMA_expr_divide unexpected error : e1.index() = ",
+                e1.index(), " e2.index() = ", e2.index());
 }
-void Mathematica_Parser::parse_MMA_expr_power(MMA_EXPR &e1,
-                                              const MMA_EXPR &e2) const
+void Mathematica_Parser::parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2)
 {
   if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
     {
@@ -482,8 +488,8 @@ void Mathematica_Parser::parse_MMA_expr_power(MMA_EXPR &e1,
       return;
     }
 
-  MMA_PARSER_ERROR("parse_MMA_expr_power unexpected error : e1.index() = ",
-                   e1.index(), " e2.index() = ", e2.index());
+  RUNTIME_ERROR("parse_MMA_expr_power unexpected error : e1.index() = ",
+                e1.index(), " e2.index() = ", e2.index());
 }
 void Mathematica_Parser::parse_MMA_expr_single_operate(
   std::list<MMA_ELEMENT> &chain, std::list<MMA_ELEMENT>::iterator it) const
@@ -513,8 +519,8 @@ void Mathematica_Parser::parse_MMA_expr_single_operate(
                            AS_MMA_ELEMENT(*it_r, Expression));
       break;
     default:
-      MMA_PARSER_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
-                       AS_MMA_ELEMENT(*it, Operator));
+      RUNTIME_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
+                    AS_MMA_ELEMENT(*it, Operator));
       break;
     }
 
@@ -531,8 +537,8 @@ int Mathematica_Parser::parse_MMA_precedence(const char op) const
     case '/': return 2;
     case '^': return 1;
     default:
-      MMA_PARSER_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
-                       op);
+      RUNTIME_ERROR("parse_MMA_precedence unexpected error : illegal op : ",
+                    op);
       break;
     }
 }

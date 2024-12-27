@@ -10,7 +10,6 @@
 class Mathematica_Parser
 {
 private:
-  const char *ptr_MMA_begin = nullptr;
   const char *ptr_MMA_current = nullptr;
 
 public:
@@ -23,6 +22,18 @@ public:
   parse_token(const char *begin, const char *end, MMA_TOKEN &result);
 
 private:
+  template <class... TArgs>
+  [[noreturn]] void
+  parse_error_with_position_and_next_chars(const char *begin, const char *end,
+                                           const TArgs &...args)
+  {
+    const auto pos = ptr_MMA_current - begin;
+    constexpr int max_length = 32;
+    const auto next_chars = short_string(ptr_MMA_current, end, max_length);
+    RUNTIME_ERROR("Failed to parse Mathematica input at position: ", pos,
+                  ", next characters: ", next_chars, args...);
+  }
+
   template <class T>
   const char *reset_and_parse(
     const char *begin, const char *end,
@@ -33,7 +44,19 @@ private:
     ASSERT(end != nullptr);
     ASSERT(begin <= end);
     reset(begin, end);
-    return parse_func(begin, end, result);
+    try
+      {
+        return parse_func(begin, end, result);
+      }
+    catch(std::exception &e)
+      {
+        parse_error_with_position_and_next_chars(begin, end,
+                                                 "\nException: ", e.what());
+      }
+    catch(...)
+      {
+        parse_error_with_position_and_next_chars(begin, end, "\nException: ");
+      }
   }
 
 protected:
@@ -50,12 +73,11 @@ protected:
 protected:
   void reset(const char *begin, const char *end);
 
-  // Parser implementation
+  // Helper function: return up to max_length characters from [begin,end)
+  static std::string
+  short_string(const char *begin, const char *end, size_t max_length = 16);
 
-  // TODO: use custom exception type (storing current const char*),
-  // catch exception in top-level parse() function and print position?
-  template <class... TArgs>
-  [[noreturn]] void MMA_PARSER_ERROR(const TArgs &...args) const;
+  // Parser implementation
 
   const std::string MMA_expr_delimiters = "()[]{}+-*/^, \t\n\v\f\r";
 
@@ -99,14 +121,14 @@ protected:
 
   const char *parse_MMA_expr_list(const char *begin, const char *end,
                                   std::list<MMA_ELEMENT> &chain);
-  void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2) const;
+  static void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2);
 
-  void parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2) const;
-  void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2) const;
+  static void parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2);
+  static void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2);
 
-  void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2) const;
+  static void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2);
 
-  void parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2) const;
+  static void parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2);
 
   void
   parse_MMA_expr_single_operate(std::list<MMA_ELEMENT> &chain,
@@ -120,13 +142,6 @@ protected:
   const char *
   parse_MMA_expr(const char *begin, const char *end, MMA_ELEMENT &result);
 };
-
-template <class... TArgs>
-void Mathematica_Parser::MMA_PARSER_ERROR(const TArgs &...args) const
-{
-  RUNTIME_ERROR("current ptr in MMA file : ", ptr_MMA_current - ptr_MMA_begin,
-                "\n", args...);
-}
 
 template <class InputIterator>
 InputIterator
