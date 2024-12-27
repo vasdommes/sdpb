@@ -145,16 +145,27 @@ Mathematica_Parser::parse_get_token(const char *begin, const char *end,
       SET_MMA_TOKEN(token, std::string(p, q), Symbol);
       return q;
     }
-  // parse string
-  if(*p == '\"')
+  // parse string literal
+  // NB: if we are parsing a JSON string, strings inside MMA expressions
+  // will look like \"someString\"
+  // TODO: this will fail if the literal itself contains escaped quotes inside,
+  // e.g.: \"some quote \\\" in string\"
+  // Hopefully we'll never meet such case.
+  const bool escape = *p == '\\';
+  if(*p == '\"' || (escape && p + 1 < end && *(p + 1) == '\"'))
     {
-      auto q = std::find(p + 1, end, '\"');
-      if(q == end)
-        {
-          RUNTIME_ERROR("Unrecognizable expression: ", std::string(p, q));
-        }
-      SET_MMA_TOKEN(token, std::string(p + 1, q), String);
-      return q + 1;
+      const char *content_start = escape ? p + 2 : p + 1;
+      // look for \" or "
+      const char *content_end
+        = escape ? std::adjacent_find(content_start, end,
+                                      [](const char a, const char b) {
+                                        return a == '\\' && b == '"';
+                                      })
+                 : std::find(content_start, end, '"');
+      ASSERT(content_end != end, "Unfinished string literal");
+      SET_MMA_TOKEN(token, std::string(content_start, content_end), String);
+      // after closing "
+      return escape ? content_end + 2 : content_end + 1;
     }
   // handle "\\\n" case
   if(*p == '\\' && *(p + 1) == '\n')
