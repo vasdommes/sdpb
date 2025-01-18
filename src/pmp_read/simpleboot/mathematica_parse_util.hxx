@@ -2,11 +2,13 @@
 
 // Utility functions for Mathematica_Simpleboot_Expression_Parser
 
+#include "Linear_Combination_Of_Mathematica_Functions.hxx"
 #include "pmp/Polynomial.hxx"
 #include "sdpb_util/Boost_Float.hxx"
 #include "sdpb_util/assert.hxx"
 
 #include <El.hpp>
+#include <utility>
 #include <variant>
 
 using MMA_TOKEN = std::variant<std::monostate, int, El::BigFloat, char,
@@ -21,9 +23,11 @@ using MMA_TOKEN = std::variant<std::monostate, int, El::BigFloat, char,
 #define AS_MMA_TOKEN(var, T) std::get<MMA_TOKEN_##T>(var)
 #define SET_MMA_TOKEN(var, value, T) var.emplace<MMA_TOKEN_##T>(value)
 
-using MMA_EXPR = std::variant<El::BigFloat, Polynomial>;
+using MMA_EXPR = std::variant<El::BigFloat, Polynomial,
+                              Linear_Combination_Of_Mathematica_Functions>;
 #define MMA_EXPR_Number 0
 #define MMA_EXPR_Polynomial 1
+#define MMA_EXPR_Linear_Combination_Of_Functions 2
 #define AS_MMA_EXPR(var, T) std::get<MMA_EXPR_##T>(var)
 #define SET_MMA_EXPR(var, value, T) var.emplace<MMA_EXPR_##T>(value)
 
@@ -36,6 +40,9 @@ using MMA_ELEMENT = std::variant<std::monostate, MMA_EXPR, char>;
   std::get<MMA_EXPR_Number>(std::get<MMA_ELEMENT_Expression>(var))
 #define AS_MMA_ELEMENT_Polynomial(var)                                        \
   std::get<MMA_EXPR_Polynomial>(std::get<MMA_ELEMENT_Expression>(var))
+#define AS_MMA_ELEMENT_Linear_Combination_Of_Functions(var)                   \
+  std::get<MMA_EXPR_Linear_Combination_Of_Functions>(                         \
+    std::get<MMA_ELEMENT_Expression>(var))
 #define SET_MMA_ELEMENT(var, value, T) var.emplace<MMA_ELEMENT_##T>(value)
 
 std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v);

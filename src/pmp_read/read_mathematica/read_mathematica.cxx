@@ -9,8 +9,8 @@ namespace fs = std::filesystem;
 const char *
 parse_SDP(const char *begin, const char *end,
           const std::function<bool(size_t matrix_index)> &should_parse_matrix,
-          std::optional<std::vector<El::BigFloat>> &objectives,
-          std::optional<std::vector<El::BigFloat>> &normalization,
+          PMP_File_Parse_Result::objective_type &objectives,
+          PMP_File_Parse_Result::normalization_type &normalization,
           size_t &num_matrices,
           std::map<size_t, Polynomial_Vector_Matrix> &parsed_matrices);
 
@@ -30,11 +30,9 @@ PMP_File_Parse_Result read_mathematica(
   boost::interprocess::mapped_region mapped_region(
     mapped_file, boost::interprocess::read_only);
 
-      const char *begin(
-        static_cast<const char *>(mapped_region.get_address())),
-        *end(begin + mapped_region.get_size());
-      parse_SDP(begin, end, should_parse_matrix, result.objective,
-                result.normalization, result.num_matrices,
-                result.parsed_matrices);
+  const char *begin(static_cast<const char *>(mapped_region.get_address())),
+    *end(begin + mapped_region.get_size());
+  parse_SDP(begin, end, should_parse_matrix, result.objective,
+            result.normalization, result.num_matrices, result.parsed_matrices);
   return result;
 }

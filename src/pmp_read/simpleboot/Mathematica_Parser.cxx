@@ -337,8 +337,15 @@ Mathematica_Parser::parse_MMA_expr_list(const char *begin, const char *end,
             MMA_EXPR &expr = AS_MMA_ELEMENT(elmt, Expression);
             if(expr.index() == MMA_EXPR_Number)
               AS_MMA_ELEMENT_Number(elmt) *= -1;
-            else
+            else if(expr.index() == MMA_EXPR_Polynomial)
               AS_MMA_ELEMENT_Polynomial(elmt) *= -1;
+            else if(expr.index() == MMA_EXPR_Linear_Combination_Of_Functions)
+              AS_MMA_ELEMENT_Linear_Combination_Of_Functions(elmt) *= -1;
+            else
+              RUNTIME_ERROR("Cannot apply unary minus in expression: ",
+                            short_string(begin, end), "\n ",
+                            DEBUG_STRING(expr.index()));
+
             chain.push_back(std::move(elmt));
             break;
           }
@@ -413,6 +420,14 @@ void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
+  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
+     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
+    {
+      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
+        += AS_MMA_EXPR(e2, Linear_Combination_Of_Functions);
+      return;
+    }
+
   RUNTIME_ERROR("parse_MMA_expr_add unexpected error : e1.index() = ",
                 e1.index(), " e2.index() = ", e2.index());
 }
@@ -444,7 +459,15 @@ void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
-  RUNTIME_ERROR("parse_MMA_expr_substract unexpected error : e1.index() = ",
+  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
+     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
+    {
+      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
+        -= AS_MMA_EXPR(e2, Linear_Combination_Of_Functions);
+      return;
+    }
+
+  RUNTIME_ERROR("parse_MMA_expr_subtract unexpected error : e1.index() = ",
                 e1.index(), " e2.index() = ", e2.index());
 }
 void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
@@ -468,6 +491,24 @@ void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
       return;
     }
 
+  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
+     && e2.index() == MMA_EXPR_Number)
+    {
+      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
+        *= AS_MMA_EXPR(e2, Number);
+      return;
+    }
+
+  if(e1.index() == MMA_EXPR_Number
+     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
+    {
+      AS_MMA_EXPR(e2, Linear_Combination_Of_Functions)
+        *= AS_MMA_EXPR(e1, Number);
+      SET_MMA_EXPR(e1, AS_MMA_EXPR(e2, Linear_Combination_Of_Functions),
+                   Linear_Combination_Of_Functions);
+      return;
+    }
+
   RUNTIME_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = ",
                 e1.index(), " e2.index() = ", e2.index());
 }
@@ -483,6 +524,14 @@ void Mathematica_Parser::parse_MMA_expr_divide(MMA_EXPR &e1,
   if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Number)
     {
       AS_MMA_EXPR(e1, Polynomial) /= AS_MMA_EXPR(e2, Number);
+      return;
+    }
+
+  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
+     && e2.index() == MMA_EXPR_Number)
+    {
+      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
+        /= AS_MMA_EXPR(e2, Number);
       return;
     }
 

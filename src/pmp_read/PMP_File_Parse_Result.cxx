@@ -5,10 +5,11 @@
 namespace fs = std::filesystem;
 
 PMP_File_Parse_Result
-read_json(const std::filesystem::path &input_path, bool should_parse_objective,
-          bool should_parse_normalization,
-          const std::function<bool(size_t matrix_index)> &should_parse_matrix,
-          const std::optional<Simpleboot_Parameters> &simpleboot_parameters);
+read_json(
+  const std::filesystem::path &input_path, bool should_parse_objective,
+  bool should_parse_normalization,
+  const std::function<bool(size_t matrix_index)> &should_parse_matrix,
+  const std::shared_ptr<PMP_Simpleboot_Parsing_Context<>> &simpleboot_context);
 
 PMP_File_Parse_Result read_mathematica(
   const std::filesystem::path &input_path,
@@ -22,7 +23,7 @@ PMP_File_Parse_Result PMP_File_Parse_Result::read(
   const fs::path &input_path, bool should_parse_objective,
   bool should_parse_normalization,
   const std::function<bool(size_t matrix_index)> &should_parse_matrix,
-  const ::std::optional<Simpleboot_Parameters> &simpleboot_parameters)
+  const std::shared_ptr<PMP_Simpleboot_Parsing_Context<>> &simpleboot_context)
 {
   PMP_File_Parse_Result result;
   try
@@ -33,20 +34,20 @@ PMP_File_Parse_Result PMP_File_Parse_Result::read(
         {
           result = read_json(input_path, should_parse_objective,
                              should_parse_normalization, should_parse_matrix,
-                             simpleboot_parameters);
+                             simpleboot_context);
         }
       // TODO: use should_parse_objective and should_parse_normalization
       // also in read_mathematica() and read_xml()
       else if(input_path.extension() == ".m")
         {
-          ASSERT(!simpleboot_parameters.has_value(),
+          ASSERT(simpleboot_context == nullptr,
                  "Simpleboot not supported for PMP in Mathematica format, "
                  "consider using JSON.");
           result = read_mathematica(input_path, should_parse_matrix);
         }
       else if(input_path.extension() == ".xml")
         {
-          ASSERT(!simpleboot_parameters.has_value(),
+          ASSERT(simpleboot_context == nullptr,
                  "Simpleboot not supported for XML in Mathematica format, "
                  "consider using JSON.");
           result = read_xml(input_path, should_parse_matrix);

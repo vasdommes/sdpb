@@ -1,6 +1,7 @@
 #include "parse_vector.hxx"
 #include "parse_generic.hxx"
 #include "pmp/Polynomial_Vector_Matrix.hxx"
+#include "pmp_read/PMP_File_Parse_Result.hxx"
 #include "sdpb_util/assert.hxx"
 
 #include <algorithm>
@@ -17,8 +18,8 @@ const char *parse_matrices(
 const char *
 parse_SDP(const char *begin, const char *end,
           const std::function<bool(size_t matrix_index)> &should_parse_matrix,
-          std::optional<std::vector<El::BigFloat>> &objectives,
-          std::optional<std::vector<El::BigFloat>> &normalization,
+          PMP_File_Parse_Result::objective_type &objectives,
+          PMP_File_Parse_Result::normalization_type &normalization,
           size_t &num_matrices,
           std::map<size_t, Polynomial_Vector_Matrix> &parsed_matrices)
 {

@@ -10,6 +10,8 @@ struct PMP_Default_Parsing_Context
 {
   template <class TFloat> using Float_Parser = Json_Float_Parser<TFloat>;
   using Polynomial_Parser = Json_Polynomial_Parser<Float_Parser<El::BigFloat>>;
+  using Objective_Element_Parser = Float_Parser<El::BigFloat>;
+  using Normalization_Element_Parser = Float_Parser<El::BigFloat>;
 };
 
 template <class TContext = PMP_Default_Parsing_Context>
@@ -25,6 +27,10 @@ private:
   using BigFloat_Parser = Float_Parser<El::BigFloat>;
   using BigFloat_Vector_Parser = Json_Vector_Parser<BigFloat_Parser>;
   using Polynomial_Parser = typename TContext::Polynomial_Parser;
+  using Objective_Parser
+    = Json_Vector_Parser<typename TContext::Objective_Element_Parser>;
+  using Normalization_Parser
+    = Json_Vector_Parser<typename TContext::Normalization_Element_Parser>;
 
   using Json_Positive_Matrix_With_Prefactor_Array_Parser
     = Json_Vector_Parser_With_Skip<Json_Positive_Matrix_With_Prefactor_Parser<
@@ -33,8 +39,8 @@ private:
   PMP_File_Parse_Result result;
 
   // Nested parsers
-  BigFloat_Vector_Parser objective_parser;
-  BigFloat_Vector_Parser normalization_parser;
+  Objective_Parser objective_parser;
+  Normalization_Parser normalization_parser;
   Json_Positive_Matrix_With_Prefactor_Array_Parser matrices_parser;
 
 public:
@@ -52,14 +58,16 @@ public:
       : base_type(false, on_parsed, [] {}),
         objective_parser(
           !should_parse_objective,
-          [this](std::vector<El::BigFloat> &&result) {
-            this->result.objective = std::move(result);
-          },
+          [this](
+            std::vector<typename TContext::Objective_Element_Parser::value_type>
+              &&result) { this->result.objective = std::move(result); },
           [] {}, std::forward<TArgs>(args)...),
         normalization_parser(
           !should_parse_normalization,
           // accept normalization vector:
-          [this](std::vector<El::BigFloat> &&result) {
+          [this](std::vector<
+                 typename TContext::Normalization_Element_Parser::value_type>
+                   &&result) {
             this->result.normalization = std::move(result);
           },
           [] {}, std::forward<TArgs>(args)...),

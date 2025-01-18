@@ -3,7 +3,7 @@
 #include "Dual_Constraint_Group.hxx"
 #include "write_sdp.hxx"
 #include "pmp_read/pmp_read.hxx"
-#include "pmp_read/simpleboot/Simpleboot_Parameters.hxx"
+#include "pmp_read/simpleboot/data_provider/Simpleboot_Parameters.hxx"
 #include "sdpb_util/Verbosity.hxx"
 #include "sdpb_util/Timers/Timers.hxx"
 

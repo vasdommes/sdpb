@@ -1,6 +1,6 @@
-#include "mathematica_parse_util.hxx"
-#include "Mathematica_Parser.hxx"
 #include "Simpleboot_Parameters.hxx"
+#include "pmp_read/simpleboot/Mathematica_Parser.hxx"
+#include "pmp_read/simpleboot/mathematica_parse_util.hxx"
 #include "sdpb_util/assert.hxx"
 
 #include <El.hpp>

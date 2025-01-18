@@ -16,10 +16,10 @@ class Json_String_Element_Parser : public Abstract_Json_Element_Parser<TResult>
   TResult result;
 
 protected:
-  virtual TResult from_string(const std::string &string_value)
-  {
-    return TResult(string_value);
-  }
+  virtual TResult from_string(const std::string &string_value) = 0;
+  // {
+  //   return TResult(string_value);
+  // }
 
 public:
   using typename Abstract_Json_Element_Parser<TResult>::value_type;

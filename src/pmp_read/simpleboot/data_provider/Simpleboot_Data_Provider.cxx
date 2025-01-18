@@ -51,12 +51,57 @@ namespace
     ia & zzb_derivs_conv_El;
     return zzb_derivs_conv_El;
   }
+
+  std::map<std::pair<std::string, int>, int>
+  generate_blockF_key2index(const std::string &block_folder)
+  {
+    namespace fs = std::filesystem;
+    using block_key_type = std::pair<std::string, int>;
+    std::map<block_key_type, int> blockF_key2index;
+
+    // Note that directory_iterator does not specify items order.
+    // we put keys in map first (thus sorting them) and enumerate at the end.
+    for(auto const &file : fs::directory_iterator(block_folder))
+      {
+        if(fs::is_regular_file(file)
+           && file.path().extension() == std::string(".block"))
+          {
+            const std::string filename = file.path().filename().string();
+            size_t barL = filename.find("-L");
+            if(barL == std::string::npos)
+              RUNTIME_ERROR("Load block error : invalid block file name : ",
+                            filename);
+            const std::string stamp = filename.substr(0, barL);
+            barL += 2;
+            const size_t dot = filename.find(".", barL);
+            if(dot == std::string::npos)
+              RUNTIME_ERROR("Load block error : invalid block file name : ",
+                            filename);
+            int spin = std::stoi(filename.substr(barL, dot));
+
+            blockF_key2index.emplace(std::make_pair(stamp, spin), 0);
+          }
+      }
+
+    int i = 0;
+    for(auto &[key, index] : blockF_key2index)
+      index = i++;
+    return blockF_key2index;
+  }
 }
 
 Simpleboot_Data_Provider::Simpleboot_Data_Provider(
-  const Simpleboot_Parameters &parameters)
-    : Abstract_Simpleboot_Data_Provider(parameters)
+  const Simpleboot_Parameters &params)
+    : Abstract_Simpleboot_Data_Provider(params),
+      block_folder(params.block_folder),
+      blockF_key2index(generate_blockF_key2index(block_folder))
 {}
+
+int Simpleboot_Data_Provider::get_index(const std::string &stamp,
+                                        int spin) const
+{
+  return blockF_key2index.at({stamp, spin});
+}
 
 Polynomial
 Simpleboot_Data_Provider::blockF_lookup(const std::string &stamp, const int L,

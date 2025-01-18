@@ -1,5 +1,5 @@
 #include <catch2/catch_amalgamated.hpp>
-#include "pmp_read/simpleboot/Abstract_Simpleboot_Data_Provider.hxx"
+#include "pmp_read/simpleboot/data_provider/Abstract_Simpleboot_Data_Provider_Evaluated.hxx"
 #include "pmp_read/simpleboot/Mathematica_Simpleboot_Expression_Parser.hxx"
 #include "unit_tests/util/util.hxx"
 
@@ -7,10 +7,10 @@ using Test_Util::REQUIRE_Equal::diff;
 namespace
 {
   struct Simpleboot_Test_Data_Provider final
-      : Abstract_Simpleboot_Data_Provider
+      : Abstract_Simpleboot_Data_Provider_Evaluated
   {
     explicit Simpleboot_Test_Data_Provider(const Simpleboot_Parameters &params)
-        : Abstract_Simpleboot_Data_Provider(params)
+        : Abstract_Simpleboot_Data_Provider_Evaluated(params)
     {}
 
     // Set default simpleboot parameters to arbitrary numbers

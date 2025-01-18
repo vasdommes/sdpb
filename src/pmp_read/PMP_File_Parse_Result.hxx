@@ -1,7 +1,8 @@
 #pragma once
 
 #include "pmp/Polynomial_Vector_Matrix.hxx"
-#include "simpleboot/Simpleboot_Parameters.hxx"
+#include "simpleboot/Linear_Combination_Of_Mathematica_Functions.hxx"
+#include "simpleboot/PMP_Simpleboot_Parsing_Context.hxx"
 
 #include <El.hpp>
 
@@ -11,11 +12,17 @@
 
 struct PMP_File_Parse_Result
 {
+public:
+  using objective_type = std::optional<
+    std::variant<std::vector<El::BigFloat>,
+                 std::vector<Linear_Combination_Of_Mathematica_Functions>>>;
+  using normalization_type = objective_type;
+
   // Vector a_0..a_N, see (3.1) in SDPB Manual
-  std::optional<std::vector<El::BigFloat>> objective;
-  // Normaliation vector n_0..n_N, see (3.1) in SDPB Manual
-  std::optional<std::vector<El::BigFloat>> normalization;
-  // Total number of PMWP matrices in file
+  objective_type objective;
+  // Normalization vector n_0..n_N, see (3.1) in SDPB Manual
+  normalization_type normalization;
+  // Total number of PVM matrices in file
   size_t num_matrices = 0;
   // If file is read by several processes,
   // each process saves only some matrices, according to should_parse_matrix()
@@ -31,7 +38,8 @@ struct PMP_File_Parse_Result
   read(const std::filesystem::path &input_path, bool should_parse_objective,
        bool should_parse_normalization,
        const std::function<bool(size_t matrix_index)> &should_parse_matrix,
-       const std::optional<Simpleboot_Parameters> &simpleboot_parameters);
+       const std::shared_ptr<PMP_Simpleboot_Parsing_Context<>>
+         &simpleboot_context);
 
   // Allow moving and prevent accidential copying
 

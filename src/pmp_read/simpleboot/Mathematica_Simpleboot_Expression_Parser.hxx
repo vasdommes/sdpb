@@ -7,8 +7,12 @@
 
 #include <memory>
 
-template <class TSimpleboot_Data_Provider>
-class Mathematica_Simpleboot_Expression_Parser final : public Mathematica_Parser
+// evaluate_F0_F_FS = false when parsing objective and normalization,
+// so that the parser does not evaluate Mathematica functions F0, F and FS.
+// (they're evaluated later in parallel)
+template <class TSimpleboot_Data_Provider, bool evaluate_F0_F_FS = true>
+class Mathematica_Simpleboot_Expression_Parser final
+    : public Mathematica_Parser
 {
 private:
   const char *ptr_MMA_begin = nullptr;
@@ -22,6 +26,42 @@ public:
       : data_provider(std::move(data_provider))
   {}
 
+  void F0(const El::BigFloat &x, int m, int n, MMA_ELEMENT &result)
+  {
+    if(evaluate_F0_F_FS)
+      data_provider->F0(x, m, n, result);
+    else
+      result.emplace<MMA_EXPR>(Linear_Combination_Of_Mathematica_Functions(
+        Mathematica_Function_F0(x, m, n)));
+  }
+  void F(const std::string &stamp, int L, int m, int n, const El::BigFloat &x,
+         MMA_ELEMENT &result)
+  {
+    if(evaluate_F0_F_FS)
+      data_provider->F(stamp, L, m, n, x, result);
+    else
+      result.emplace<MMA_EXPR>(Linear_Combination_Of_Mathematica_Functions(
+        Mathematica_Function_F(stamp, L, m, n, x)));
+  }
+  void FS(const std::string &stamp, int L, int m, int n, const El::BigFloat &x,
+          MMA_ELEMENT &result)
+  {
+    if(evaluate_F0_F_FS)
+      data_provider->FS(stamp, L, m, n, x, result);
+    else
+      result.emplace<MMA_EXPR>(Linear_Combination_Of_Mathematica_Functions(
+        Mathematica_Function_FS(stamp, L, m, n, x)));
+  }
+  void P(const std::string &stamp, int L, int m, int n,
+         const El::BigFloat &shift, MMA_ELEMENT &result)
+  {
+    data_provider->P(stamp, L, m, n, shift, result);
+  }
+  void PT(const std::string &stamp, int L, int m, int n, const El::BigFloat &a,
+          const El::BigFloat &b, MMA_ELEMENT &result)
+  {
+    data_provider->PT(stamp, L, m, n, a, b, result);
+  }
 
   // for our purpose now, we only need
   // P[stamp, L, m, n, shift] : block derivative polynomial
@@ -57,9 +97,9 @@ public:
         pstr = parse_MMA_check_op(pstr, end, token, ']');
 
         if(name == "F")
-          data_provider->F(stamp, L, m, n, x, result);
+          F(stamp, L, m, n, x, result);
         else
-          data_provider->FS(stamp, L, m, n, x, result);
+          FS(stamp, L, m, n, x, result);
 
         return pstr;
       }
@@ -88,7 +128,7 @@ public:
         pstr = parse_MMA_expr_as_number(pstr, end, x);
         pstr = parse_MMA_check_op(pstr, end, token, ']');
 
-        data_provider->P(stamp, L, m, n, x, result);
+        P(stamp, L, m, n, x, result);
 
         return pstr;
       }
@@ -120,7 +160,7 @@ public:
         pstr = parse_MMA_expr_as_number(pstr, end, b);
         pstr = parse_MMA_check_op(pstr, end, token, ']');
 
-        data_provider->PT(stamp, L, m, n, a, b, result);
+        PT(stamp, L, m, n, a, b, result);
 
         return pstr;
       }
@@ -142,13 +182,13 @@ public:
         pstr = parse_MMA_token_as_int(pstr, end, token, n);
         pstr = parse_MMA_check_op(pstr, end, token, ']');
 
-        data_provider->F0(x, m, n, result);
+        F0(x, m, n, result);
 
         return pstr;
       }
 
     RUNTIME_ERROR("parse_MMA_function error : unsupported ",
-                     DEBUG_STRING(name), " \n");
+                  DEBUG_STRING(name), " \n");
   }
 
   void parse_MMA_symbol(const std::string &name, MMA_ELEMENT &result) override

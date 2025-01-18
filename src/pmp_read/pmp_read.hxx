@@ -1,7 +1,7 @@
 #pragma once
 #include "pmp/Polynomial_Matrix_Program.hxx"
 #include "sdpb_util/Timers/Timers.hxx"
-#include "simpleboot/Simpleboot_Parameters.hxx"
+#include "simpleboot/data_provider/Simpleboot_Parameters.hxx"
 
 #include <filesystem>
 #include <vector>
