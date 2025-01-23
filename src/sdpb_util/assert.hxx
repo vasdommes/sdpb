@@ -12,7 +12,7 @@ template <class OStream> OStream &build_stream(OStream &os)
 }
 
 template <class OStream, class T, class... ArgPack>
-std::ostream &build_stream(OStream &os, const T &item, const ArgPack &...args)
+OStream &build_stream(OStream &os, const T &item, const ArgPack &...args)
 {
   os << item;
   return build_stream(os, args...);
