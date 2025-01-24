@@ -182,7 +182,7 @@ Mathematica_Parser::parse_MMA_check_op(const char *begin, const char *end,
   if(token.index() != MMA_TOKEN_Operator
      || AS_MMA_TOKEN(token, Operator) != op)
     RUNTIME_ERROR("parse_MMA_check_op error : expect ", op, ", but I got ",
-                  token, " from text ", short_string(begin, end));
+                  to_string(token), " from text ", short_string(begin, end));
   return pstr;
 }
 const char *
@@ -192,8 +192,8 @@ Mathematica_Parser::parse_MMA_token_as_int(const char *begin, const char *end,
   const char *pstr = parse_get_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Integer)
     RUNTIME_ERROR(
-      "parse_MMA_get_token_as_int error : expect integer, but I got ", token,
-      " from text ", short_string(begin, end));
+      "parse_MMA_get_token_as_int error : expect integer, but I got ",
+      to_string(token), " from text ", short_string(begin, end));
   int_num = AS_MMA_TOKEN(token, Integer);
   return pstr;
 }
@@ -250,7 +250,7 @@ Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
                  || AS_MMA_TOKEN(token_next, Operator) != ')')
                 RUNTIME_ERROR("Expected ')' at '",
                               short_string(pstr - 1, pstr + 3), "' but got ",
-                              token_next);
+                              to_string(token_next));
 
               return pstr;
             }
@@ -287,7 +287,7 @@ Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
 
     case MMA_TOKEN_String:
     default:
-      RUNTIME_ERROR("Unexpected token : ", token, " before ",
+      RUNTIME_ERROR("Unexpected token : ", to_string(token), " before ",
                     short_string(pstr, end));
       break;
     }

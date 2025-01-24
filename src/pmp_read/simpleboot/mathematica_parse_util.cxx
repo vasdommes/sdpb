@@ -60,3 +60,17 @@ std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v)
   // std::visit([&os](auto &&arg) { os << arg; }, v);
   return os;
 }
+
+std::string to_string(const MMA_ELEMENT &v)
+{
+  std::stringstream ss;
+  ss << v;
+  return ss.str();
+}
+
+std::string to_string(const MMA_TOKEN &v)
+{
+  std::stringstream ss;
+  ss << v;
+  return ss.str();
+}

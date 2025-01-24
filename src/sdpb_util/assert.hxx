@@ -11,6 +11,8 @@ template <class OStream> OStream &build_stream(OStream &os)
   return os;
 }
 
+// TODO: this won't compile if operator<< is declared later.
+// Shall we use a (pretty verbose) macro instead?
 template <class OStream, class T, class... ArgPack>
 OStream &build_stream(OStream &os, const T &item, const ArgPack &...args)
 {

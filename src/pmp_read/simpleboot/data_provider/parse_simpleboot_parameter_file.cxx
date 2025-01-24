@@ -50,7 +50,7 @@ const char *parse_MMA_check_op(const char *begin, const char *end,
   if(token.index() != MMA_TOKEN_Operator
      || AS_MMA_TOKEN(token, Operator) != op)
     RUNTIME_ERROR("parse_MMA_check_op error : expect ", op, ", but I got ",
-                  token, " from text ", std::string(begin, 20));
+                  to_string(token), " from text ", std::string(begin, 20));
   return pstr;
 }
 
@@ -61,7 +61,7 @@ const char *parse_MMA_get_op(const char *begin, const char *end,
   const char *pstr = parser.parse_token(begin, end, token);
   if(token.index() != MMA_TOKEN_Operator)
     RUNTIME_ERROR("parse_MMA_get_op error : expect Operator, but I got ",
-                  token, " from text ", std::string(begin, 20));
+                  to_string(token), " from text ", std::string(begin, 20));
   op = AS_MMA_TOKEN(token, Operator);
   return pstr;
 }

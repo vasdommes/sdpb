@@ -5,7 +5,7 @@
 #include "sdpb_util/assert.hxx"
 
 #include <functional>
-#include <memory>
+#include <list>
 
 class Mathematica_Parser
 {

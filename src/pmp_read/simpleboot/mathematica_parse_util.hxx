@@ -48,6 +48,9 @@ using MMA_ELEMENT = std::variant<std::monostate, MMA_EXPR, char>;
 std::ostream &operator<<(std::ostream &os, const MMA_ELEMENT &v);
 std::ostream &operator<<(std::ostream &os, const MMA_TOKEN &v);
 
+std::string to_string(const MMA_ELEMENT &v);
+std::string to_string(const MMA_TOKEN &v);
+
 // Helper function used by Json_Simpleboot_Float_Parser and Json_Simpleboot_Polynomial_Parser.
 // We had to move from_MMA_element() outside of class
 // because C++ does not allow partial specialization for member functions
