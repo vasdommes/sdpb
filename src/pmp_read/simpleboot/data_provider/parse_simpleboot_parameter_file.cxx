@@ -38,7 +38,25 @@ const char *parse_token(const char *begin, const char *end,
 {
   MMA_TOKEN token;
   const auto parse_end = parser.parse_token(begin, end, token);
-  result = std::get<T>(token);
+  try
+    {
+      // result = std::get<T>(token) fails if T is BigFloat and token is integer.
+      // That's why we allow type conversions.
+      result = std::visit(
+        [&](auto &&arg) -> T {
+          using U = std::decay_t<decltype(arg)>;
+          if constexpr(std::is_constructible_v<T, U>)
+            return T(arg);
+          RUNTIME_ERROR("Cannot convert parsed object of type ",
+                        typeid(U).name(), " to type ", typeid(T).name());
+        },
+        token);
+    }
+  catch(const std::exception &e)
+    {
+      RUNTIME_ERROR("parse_token error: ", to_string(token), " from text ",
+                    std::string(begin, 20), "\n", e.what());
+    }
   return parse_end;
 }
 
@@ -109,7 +127,7 @@ const char *parse_simpleboot_parameter_file(const char *begin, const char *end,
   char op;
   while(true)
     {
-      parser.parse_token(pstr, end, token);
+      pstr = parser.parse_token(pstr, end, token);
       std::string filename = AS_MMA_TOKEN(token, String);
 
       El::Output("find input files : ", filename);
@@ -132,7 +150,7 @@ const char *parse_simpleboot_parameter_file(const char *begin, const char *end,
 
       while(true)
         {
-          parser.parse_token(pstr, end_item, token);
+          pstr = parser.parse_token(pstr, end_item, token);
           std::string var_name = AS_MMA_TOKEN(token, String);
 
           pstr = parse_MMA_check_op(pstr, end_item, parser, ',');
