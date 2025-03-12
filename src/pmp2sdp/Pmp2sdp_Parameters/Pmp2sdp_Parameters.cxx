@@ -99,7 +99,7 @@ Pmp2sdp_Parameters::Pmp2sdp_Parameters(int argc, char **argv)
 }
 bool Pmp2sdp_Parameters::is_valid() const
 {
-  return !input_file.empty();
+  return !input_file.empty() || !simpleboot_param_file.empty();
 }
 boost::property_tree::ptree to_property_tree(const Pmp2sdp_Parameters &p)
 {
