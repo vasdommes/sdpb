@@ -62,8 +62,10 @@ public:
 protected:
   virtual void clear_result() = 0;
 
+// If we're parsing array elements, delegate to element parser.
+// Otherwise, parse value by ourselves (e.g. call this_json_string() if we got JSON string instead of array)
 #define ABSTRACT_JSON_ARRAY_ELEMENT_PARSER(func)                              \
-  (state == Inside ? element_parser.func : base_type::func)
+  (state == Inside ? element_parser.func : this_##func)
 
 public:
   bool json_null() final
@@ -155,6 +157,41 @@ public:
       default: return base_type::json_start_array();
       }
   }
+
+protected:
+  // This functions can be overridden in derived parsers,
+  // For example, if we expect either array or string,
+  // then we should implement this_json_string().
+  // TODO: make a universal base class that can parse object, array, or simple value.
+
+#define VIRTUAL_NOT_IMPLEMENTED(func)                                         \
+  [[noreturn]] virtual func                                                   \
+  {                                                                           \
+    RUNTIME_ERROR("Not implemented: function '", #func, "' in class: '",      \
+                  typeid(*this).name(), "'");                                 \
+  }
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_default())
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_null())
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_bool(bool /*b*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_int(int /*i*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_uint(unsigned /*i*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_int64(int64_t /*i*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_uint64(uint64_t /*i*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_double(double /*d*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_raw_number(const Ch * /*str*/,
+                                                    SizeType /*length*/,
+                                                    bool /*copy*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_string(const Ch * /*str*/,
+                                                SizeType /*length*/,
+                                                bool /*copy*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_start_object())
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_key(const Ch * /*str*/,
+                                             SizeType /*length*/,
+                                             bool /*copy*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_end_object(SizeType /*memberCount*/))
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_start_array())
+  VIRTUAL_NOT_IMPLEMENTED(bool this_json_end_array(SizeType /*elementCount*/))
+#undef VIRTUAL_NOT_IMPLEMENTED
 };
 template <class TResult, class TElementParser>
 template <class... TArgs>

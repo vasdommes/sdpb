@@ -34,7 +34,7 @@ private:
 public:
   // This code is copied from Json_String_Element_Parser.
   // We don't inherit Json_String_Element_Parser to avoid diamond inheritance problem.
-  bool json_string(const Ch *str, SizeType length, bool copy) override
+  bool this_json_string(const Ch *str, SizeType length, bool copy) override
   {
     if(!this->skip)
       {

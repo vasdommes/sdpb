@@ -79,6 +79,8 @@ struct Abstract_Json_Reader_Handler
   VIRTUAL_NOT_IMPLEMENTED(bool json_start_array())
   VIRTUAL_NOT_IMPLEMENTED(bool json_end_array(SizeType /*elementCount*/))
 
+#undef VIRTUAL_NOT_IMPLEMENTED
+
 protected:
   ~Abstract_Json_Reader_Handler() = default;
 };
