@@ -132,7 +132,7 @@ toJsonObject[
 
 exportJson[file_,expr_]:=If[
   StringEndsQ[file,".json"],
-  Export[file,expr,"JSON"],
+  Export[file,expr,"JSON","Compact"->True],
   Throw["Expected .json extension: "<>ToString[file]]
 ];
 
