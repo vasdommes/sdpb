@@ -29,7 +29,7 @@ evalDampedRationalRegulated[DampedRational[c_,poles_,b_,x],x0_,minPoleDistance_]
 evalDampedRationalRegulated[const_?NumericQ,x0_,minPoleDistance_]:=const;
 
 nf[x_Integer, prec___] := x;
-nf[x_, prec_:prec] := NumberForm[
+nf[x_, prec_:prec] := ToString@NumberForm[
   (*InputForm is required to put expressions like 1/(x+1) to a single line*)
   InputForm[
     (*Truncate zeros from integer numbers.
