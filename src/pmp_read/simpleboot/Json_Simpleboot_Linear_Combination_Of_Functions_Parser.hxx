@@ -31,6 +31,7 @@ protected:
     MMA_ELEMENT element;
     context->linear_combination_of_unevaluated_functions_parser.parse_element(
       begin, end, element);
-    return AS_MMA_ELEMENT_Linear_Combination_Of_Functions(element);
+    return from_MMA_element<Linear_Combination_Of_Mathematica_Functions>(
+      element);
   }
 };

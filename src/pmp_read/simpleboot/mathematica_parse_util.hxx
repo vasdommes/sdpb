@@ -59,13 +59,50 @@ TResult from_MMA_element(const MMA_ELEMENT &element) = delete;
 
 template <> inline El::BigFloat from_MMA_element(const MMA_ELEMENT &element)
 {
-  return AS_MMA_ELEMENT_Number(element);
+  if(const auto *expr = std::get_if<MMA_ELEMENT_Expression>(&element))
+    {
+      if(const auto *number = std::get_if<El::BigFloat>(expr))
+        return *number;
+    }
+  RUNTIME_ERROR("Failed to convert MMA_ELEMENT to El::BigFloat: ",
+                to_string(element));
 }
 template <> inline Boost_Float from_MMA_element(const MMA_ELEMENT &element)
 {
-  return to_Boost_Float(AS_MMA_ELEMENT_Number(element));
+  return to_Boost_Float(from_MMA_element<El::BigFloat>(element));
 }
 template <> inline Polynomial from_MMA_element(const MMA_ELEMENT &element)
 {
-  return AS_MMA_ELEMENT_Polynomial(element);
+  if(const auto *expr = std::get_if<MMA_EXPR>(&element))
+    {
+      if(const auto *number = std::get_if<El::BigFloat>(expr))
+        return Polynomial(1, *number);
+      if(const auto *poly = std::get_if<Polynomial>(expr))
+        return *poly;
+    }
+  RUNTIME_ERROR("Failed to convert MMA_ELEMENT to Polynomial: ",
+                to_string(element));
+}
+
+template <>
+inline Linear_Combination_Of_Mathematica_Functions
+from_MMA_element(const MMA_ELEMENT &element)
+{
+  if(const auto *expr = std::get_if<MMA_ELEMENT_Expression>(&element))
+    {
+      if(const auto *number = std::get_if<MMA_EXPR_Number>(expr))
+        {
+          ASSERT_EQUAL(number->Sign(), 0,
+                       "Expected \"0\" or Linear_Combination_Of_Functions, "
+                       "got non-zero number: ",
+                       *number);
+          return {};
+        }
+      if(const auto *poly
+         = std::get_if<Linear_Combination_Of_Mathematica_Functions>(expr))
+        return *poly;
+    }
+  RUNTIME_ERROR("Failed to convert MMA_ELEMENT to "
+                "Linear_Combination_Of_Mathematica_Functions: ",
+                to_string(element));
 }
