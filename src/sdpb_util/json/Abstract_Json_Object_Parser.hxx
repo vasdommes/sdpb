@@ -51,47 +51,47 @@ public:
   (state == Inside ? element_parser(key).member : base_type::member)
 
 public:
-  bool json_default() override
+  bool json_default() final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_default());
   }
-  bool json_null() override
+  bool json_null() final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_null());
   }
-  bool json_bool(bool b) override
+  bool json_bool(bool b) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_bool(b));
   }
-  bool json_int(int i) override
+  bool json_int(int i) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_int(i));
   }
-  bool json_uint(unsigned i) override
+  bool json_uint(unsigned i) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_uint(i));
   }
-  bool json_int64(int64_t i) override
+  bool json_int64(int64_t i) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_int64(i));
   }
-  bool json_uint64(uint64_t i) override
+  bool json_uint64(uint64_t i) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_uint64(i));
   }
-  bool json_double(double d) override
+  bool json_double(double d) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_double(d));
   }
-  bool json_raw_number(const Ch *str, SizeType length, bool copy) override
+  bool json_raw_number(const Ch *str, SizeType length, bool copy) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(RawNumber(str, length, copy));
   }
-  bool json_string(const Ch *str, SizeType length, bool copy) override
+  bool json_string(const Ch *str, SizeType length, bool copy) final
   {
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_string(str, length, copy));
   }
-  bool json_start_object() override
+  bool json_start_object() final
   {
     ++object_level;
     switch(state)
@@ -110,7 +110,7 @@ public:
       default: return base_type::json_start_object();
       }
   }
-  bool json_key(const Ch *str, SizeType length, bool copy) override
+  bool json_key(const Ch *str, SizeType length, bool copy) final
   {
     switch(state)
       {
@@ -126,7 +126,7 @@ public:
       default: return base_type::json_key(str, length, copy);
       }
   }
-  bool json_end_object(SizeType memberCount) override
+  bool json_end_object(SizeType memberCount) final
   {
     --object_level;
     switch(state)
@@ -147,12 +147,12 @@ public:
       default: return base_type::json_end_object(memberCount);
       }
   }
-  bool json_start_array() override
+  bool json_start_array() final
   {
     ++array_level;
     return ABSTRACT_JSON_OBJECT_ELEMENT_PARSER(json_start_array());
   }
-  bool json_end_array(SizeType elementCount) override
+  bool json_end_array(SizeType elementCount) final
   {
     --array_level;
     switch(state)
