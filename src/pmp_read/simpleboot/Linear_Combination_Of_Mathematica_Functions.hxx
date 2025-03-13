@@ -185,7 +185,6 @@ struct Linear_Combination_Of_Mathematica_Functions
   }
 };
 
-
 // Parallel evaluation ofstd::vector<Linear_Combination_Of_Mathematica_Functions>
 // (used for objective and normalization)
 
@@ -316,8 +315,16 @@ namespace boost::serialization
     std::visit([&](auto &&arg) { ar & arg; }, func);
   }
 
-  template <class Archive, class T1, class T2>
-  void serialize(Archive &ar, std::pair<T1, T2> &p, const version_type &)
+  // template <class Archive, class T1, class T2>
+  // void serialize(Archive &ar, std::pair<T1, T2> &p, const version_type &)
+  // - causes compilation errors with Boost 1.68
+  template <class Archive>
+  void serialize(
+    Archive &ar,
+    std::pair<El::BigFloat,
+              Linear_Combination_Of_Mathematica_Functions::Mathematica_Function>
+      &p,
+    const version_type &)
   {
     ar & p.first;
     ar & p.second;
