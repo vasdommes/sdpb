@@ -130,7 +130,8 @@ const char *parse_simpleboot_parameter_file(const char *begin, const char *end,
       pstr = parser.parse_token(pstr, end, token);
       std::string filename = AS_MMA_TOKEN(token, String);
 
-      El::Output("find input files : ", filename);
+      if(El::mpi::Rank() == 0)
+        El::Output("find input files : ", filename);
 
       params.input_files.push_back(std::move(filename));
       pstr = parse_MMA_get_op(pstr, end_item, parser, op);
@@ -170,20 +171,23 @@ const char *parse_simpleboot_parameter_file(const char *begin, const char *end,
 
   //std::cout << std::setprecision(50) << std::fixed;
 
-  El::Output("parameter file processed");
-  El::Output("dim=", params.dim);
-  El::Output("kappa=", params.kappa);
-  El::Output("block=", params.block_folder);
+  if(El::mpi::Rank() == 0)
+    {
+      El::Output("parameter file processed");
+      El::Output("dim=", params.dim);
+      El::Output("kappa=", params.kappa);
+      El::Output("block=", params.block_folder);
 
-  El::Output("input={");
-  for(auto &file : params.input_files)
-    El::Output("  ", file);
-  El::Output("}");
+      El::Output("input={");
+      for(auto &file : params.input_files)
+        El::Output("  ", file);
+      El::Output("}");
 
-  El::Output("variables={");
-  for(const auto &[key, value] : params.var_map)
-    El::Output(key, " = ", value, "");
-  El::Output("}");
+      El::Output("variables={");
+      for(const auto &[key, value] : params.var_map)
+        El::Output(key, " = ", value, "");
+      El::Output("}");
+    }
 
   //load_block_folder(param::block_folder, blockF);
   // TODO:
