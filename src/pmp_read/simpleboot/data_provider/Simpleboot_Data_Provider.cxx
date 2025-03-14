@@ -1,41 +1,12 @@
 #include "Simpleboot_Data_Provider.hxx"
 
+#include "sdpb_util/boost_serialization.hxx".
+
 #include <boost/algorithm/string.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/math/tools/polynomial.hpp>
 #include <boost/serialization/vector.hpp>
-
-// TODO: El::BigFloat serialization is already specified "sdpb_util/boost_serialization.hxx".
-// Here we use different serialization parameters.
-// Ideally, we should use only boost_serialization.hxx.
-// NB: this requires to change the code that generates block files.
-
-namespace boost::serialization
-{
-  template <class Archive>
-  void save(Archive &ar, El::BigFloat const &f,
-            const boost::serialization::version_type &)
-  {
-    std::vector<uint8_t> local_array(f.SerializedSize());
-    f.Serialize(local_array.data());
-    ar & local_array;
-  }
-
-  template <class Archive>
-  void load(Archive &ar, El::BigFloat &f,
-            const boost::serialization::version_type &)
-  {
-    std::vector<uint8_t> local_array(f.SerializedSize());
-    ar & local_array;
-    f.Deserialize(local_array.data());
-  }
-} // namespace boost::serialization
-
-BOOST_SERIALIZATION_SPLIT_FREE(El::BigFloat)
-
-static constexpr auto boost_archive_flags
-  = boost::archive::no_header | boost::archive::no_tracking;
 
 namespace fs = std::filesystem;
 using block_type = std::vector<std::vector<std::vector<El::BigFloat>>>;
@@ -47,7 +18,7 @@ namespace
     std::vector<std::vector<std::vector<El::BigFloat>>> zzb_derivs_conv_El;
     std::ifstream ifs(file);
     ASSERT(ifs.good(), "Failed to open block file: ", file);
-    boost::archive::binary_iarchive ia(ifs, boost_archive_flags);
+    boost::archive::binary_iarchive ia(ifs, boost::archive::no_header | boost::archive::no_tracking);
     ia & zzb_derivs_conv_El;
     return zzb_derivs_conv_El;
   }
