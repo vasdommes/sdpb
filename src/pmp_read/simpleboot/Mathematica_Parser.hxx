@@ -121,10 +121,10 @@ protected:
 
   const char *parse_MMA_expr_list(const char *begin, const char *end,
                                   std::list<MMA_ELEMENT> &chain);
-  static void parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2);
+  static void parse_MMA_expr_add(MMA_EXPR &e1, const MMA_EXPR &e2);
 
-  static void parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2);
-  static void parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2);
+  static void parse_MMA_expr_subtract(MMA_EXPR &e1, const MMA_EXPR &e2);
+  static void parse_MMA_expr_multiply(MMA_EXPR &e1, const MMA_EXPR &e2);
 
   static void parse_MMA_expr_divide(MMA_EXPR &e1, const MMA_EXPR &e2);
 

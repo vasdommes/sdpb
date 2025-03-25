@@ -98,9 +98,9 @@ from_MMA_element(const MMA_ELEMENT &element)
                        *number);
           return {};
         }
-      if(const auto *poly
+      if(const auto *linear_combination
          = std::get_if<Linear_Combination_Of_Mathematica_Functions>(expr))
-        return *poly;
+        return *linear_combination;
     }
   RUNTIME_ERROR("Failed to convert MMA_ELEMENT to "
                 "Linear_Combination_Of_Mathematica_Functions: ",

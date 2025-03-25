@@ -99,7 +99,7 @@ TEST_CASE("simpleboot")
 
     MMA_ELEMENT result;
     parser.parse_element(begin, end, result);
-    auto funcs = AS_MMA_ELEMENT_Linear_Combination_Of_Functions(result);
+    auto funcs = from_MMA_element<Linear_Combination_Of_Mathematica_Functions>(result);
 
     INFO("NB: we only check that parallel and non-parallel computations give the same result.");
     INFO("TODO: check that this result is actually correct.");

@@ -203,14 +203,16 @@ const char *Mathematica_Parser::parse_MMA_expr_as_number(const char *begin,
 {
   MMA_ELEMENT element;
   const char *pstr = parse_MMA_expr(begin, end, element);
-
-  if(element.index() != MMA_ELEMENT_Expression
-     || AS_MMA_ELEMENT(element, Expression).index() != MMA_EXPR_Number)
-    RUNTIME_ERROR("Expected number at : '", short_string(begin, end),
-                  "' but got ", element);
-
-  result = AS_MMA_ELEMENT_Number(element);
-  return pstr;
+  try
+    {
+      result = from_MMA_element<El::BigFloat>(element);
+      return pstr;
+    }
+  catch(std::exception &e)
+    {
+      RUNTIME_ERROR("Expected number at : '", short_string(begin, end),
+                    "' but got ", to_string(element), "\n", e.what());
+    }
 }
 const char *
 Mathematica_Parser::parse_MMA_element(const char *begin, const char *end,
@@ -302,7 +304,7 @@ Mathematica_Parser::parse_MMA_element_as_expression(const char *begin,
 
   if(result.index() != MMA_ELEMENT_Expression)
     RUNTIME_ERROR("Expecting expression at : '", short_string(begin, end),
-                  "' but got ", result);
+                  "' but got ", to_string(result));
   return pstr;
 }
 bool Mathematica_Parser::parse_MMA_expr_delimitersQ(const MMA_ELEMENT &elmt)
@@ -335,17 +337,20 @@ Mathematica_Parser::parse_MMA_expr_list(const char *begin, const char *end,
           case '-': {
             pstr = parse_MMA_element_as_expression(pstr, end, elmt);
             MMA_EXPR &expr = AS_MMA_ELEMENT(elmt, Expression);
-            if(expr.index() == MMA_EXPR_Number)
-              AS_MMA_ELEMENT_Number(elmt) *= -1;
-            else if(expr.index() == MMA_EXPR_Polynomial)
-              AS_MMA_ELEMENT_Polynomial(elmt) *= -1;
-            else if(expr.index() == MMA_EXPR_Linear_Combination_Of_Functions)
-              AS_MMA_ELEMENT_Linear_Combination_Of_Functions(elmt) *= -1;
-            else
-              RUNTIME_ERROR("Cannot apply unary minus in expression: ",
-                            short_string(begin, end), "\n ",
-                            DEBUG_STRING(expr.index()));
-
+            std::visit(
+              overloaded{
+                [&](El::BigFloat &arg) { arg *= -1; },
+                [&](Polynomial &arg) { arg *= -1; },
+                [&](Linear_Combination_Of_Mathematica_Functions &arg) {
+                  arg *= -1;
+                },
+                [&](auto &arg) {
+                  RUNTIME_ERROR("Cannot apply unary minus in expression: ",
+                                short_string(begin, end), "\n ",
+                                DEBUG_STRING(expr.index()),
+                                DEBUG_STRING(typeid(arg).name()));
+                }},
+              expr);
             chain.push_back(std::move(elmt));
             break;
           }
@@ -387,169 +392,120 @@ Mathematica_Parser::parse_MMA_expr_list(const char *begin, const char *end,
         }
 
       RUNTIME_ERROR("parse_MMA_expr_Times error : illegal element : ", elmt,
-                    " after ", chain.back(), " before '",
+                    " after ", to_string(chain.back()), " before '",
                     short_string(pstr, end), "'");
     }
 
   return pstr;
 }
-void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, MMA_EXPR &e2)
+void Mathematica_Parser::parse_MMA_expr_add(MMA_EXPR &e1, const MMA_EXPR &e2)
 {
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Number) += AS_MMA_EXPR(e2, Number);
-      return;
-    }
+  std::visit(
+    overloaded{
+      [&](El::BigFloat &arg1, const El::BigFloat &arg2) { arg1 += arg2; },
+      [&](El::BigFloat &arg1, const Polynomial &arg2) {
+        auto res = arg2;
+        res += arg1;
+        e1 = std::move(res);
+      },
 
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Polynomial)
-    {
-      AS_MMA_EXPR(e1, Polynomial) += AS_MMA_EXPR(e2, Polynomial);
-      return;
-    }
+      [&](Polynomial &arg1, const El::BigFloat &arg2) { arg1 += arg2; },
+      [&](Polynomial &arg1, const Polynomial &arg2) { arg1 += arg2; },
 
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Polynomial) += AS_MMA_EXPR(e2, Number);
-      return;
-    }
+      [&](Linear_Combination_Of_Mathematica_Functions &arg1,
+          const Linear_Combination_Of_Mathematica_Functions &arg2) {
+        arg1 += arg2;
+      },
 
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Polynomial)
-    {
-      AS_MMA_EXPR(e2, Polynomial) += AS_MMA_EXPR(e1, Number);
-      SET_MMA_EXPR(e1, AS_MMA_EXPR(e2, Polynomial), Polynomial);
-      return;
-    }
-
-  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
-     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
-    {
-      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
-        += AS_MMA_EXPR(e2, Linear_Combination_Of_Functions);
-      return;
-    }
-
-  RUNTIME_ERROR("parse_MMA_expr_add unexpected error : e1.index() = ",
-                e1.index(), " e2.index() = ", e2.index());
+      [&](auto &arg1, const auto &arg2) {
+        RUNTIME_ERROR("Cannot add expressions of types: ", typeid(arg1).name(),
+                      " ", typeid(arg2).name());
+      }},
+    e1, e2);
 }
-void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1, MMA_EXPR &e2)
+void Mathematica_Parser::parse_MMA_expr_subtract(MMA_EXPR &e1,
+                                                 const MMA_EXPR &e2)
 {
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Number) -= AS_MMA_EXPR(e2, Number);
-      return;
-    }
+  std::visit(
+    overloaded{
+      [&](El::BigFloat &arg1, const El::BigFloat &arg2) { arg1 -= arg2; },
+      [&](El::BigFloat &arg1, const Polynomial &arg2) {
+        Polynomial res{};
+        res += arg1;
+        res -= arg2;
+        e1 = std::move(res);
+      },
 
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Polynomial)
-    {
-      AS_MMA_EXPR(e1, Polynomial) -= AS_MMA_EXPR(e2, Polynomial);
-      return;
-    }
+      [&](Polynomial &arg1, const El::BigFloat &arg2) { arg1 -= arg2; },
+      [&](Polynomial &arg1, const Polynomial &arg2) { arg1 -= arg2; },
 
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Polynomial) -= AS_MMA_EXPR(e2, Number);
-      return;
-    }
+      [&](Linear_Combination_Of_Mathematica_Functions &arg1,
+          const Linear_Combination_Of_Mathematica_Functions &arg2) {
+        arg1 -= arg2;
+      },
 
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Polynomial)
-    {
-      -AS_MMA_EXPR(e2, Polynomial);
-      AS_MMA_EXPR(e2, Polynomial) += AS_MMA_EXPR(e1, Number);
-      SET_MMA_EXPR(e1, AS_MMA_EXPR(e2, Polynomial), Polynomial);
-      return;
-    }
-
-  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
-     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
-    {
-      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
-        -= AS_MMA_EXPR(e2, Linear_Combination_Of_Functions);
-      return;
-    }
-
-  RUNTIME_ERROR("parse_MMA_expr_subtract unexpected error : e1.index() = ",
-                e1.index(), " e2.index() = ", e2.index());
+      [&](auto &arg1, const auto &arg2) {
+        RUNTIME_ERROR("Cannot subtract expressions of types: ",
+                      typeid(arg1).name(), " ", typeid(arg2).name());
+      }},
+    e1, e2);
 }
-void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1, MMA_EXPR &e2)
+void Mathematica_Parser::parse_MMA_expr_multiply(MMA_EXPR &e1,
+                                                 const MMA_EXPR &e2)
 {
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Number) *= AS_MMA_EXPR(e2, Number);
-      return;
-    }
+  std::visit(
+    overloaded{
+      [&](El::BigFloat &arg1, const El::BigFloat &arg2) { arg1 *= arg2; },
+      [&](El::BigFloat &arg1, const Polynomial &arg2) {
+        auto res = arg2;
+        res *= arg1;
+        e1 = std::move(res);
+      },
+      [&](El::BigFloat &arg1,
+          const Linear_Combination_Of_Mathematica_Functions &arg2) {
+        auto res = arg2;
+        res *= arg1;
+        e1 = std::move(res);
+      },
 
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Polynomial) *= AS_MMA_EXPR(e2, Number);
-      return;
-    }
+      [&](Polynomial &arg1, const El::BigFloat &arg2) { arg1 *= arg2; },
 
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Polynomial)
-    {
-      AS_MMA_EXPR(e2, Polynomial) *= AS_MMA_EXPR(e1, Number);
-      SET_MMA_EXPR(e1, AS_MMA_EXPR(e2, Polynomial), Polynomial);
-      return;
-    }
+      [&](Linear_Combination_Of_Mathematica_Functions &arg1,
+          const El::BigFloat &arg2) { arg1 *= arg2; },
 
-  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
-     && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
-        *= AS_MMA_EXPR(e2, Number);
-      return;
-    }
-
-  if(e1.index() == MMA_EXPR_Number
-     && e2.index() == MMA_EXPR_Linear_Combination_Of_Functions)
-    {
-      AS_MMA_EXPR(e2, Linear_Combination_Of_Functions)
-        *= AS_MMA_EXPR(e1, Number);
-      SET_MMA_EXPR(e1, AS_MMA_EXPR(e2, Linear_Combination_Of_Functions),
-                   Linear_Combination_Of_Functions);
-      return;
-    }
-
-  RUNTIME_ERROR("parse_MMA_expr_multiply unexpected error : e1.index() = ",
-                e1.index(), " e2.index() = ", e2.index());
+      [&](auto &arg1, const auto &arg2) {
+        RUNTIME_ERROR("Cannot multiply expressions of types: ",
+                      typeid(arg1).name(), " ", typeid(arg2).name());
+      }},
+    e1, e2);
 }
 void Mathematica_Parser::parse_MMA_expr_divide(MMA_EXPR &e1,
                                                const MMA_EXPR &e2)
 {
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Number) /= AS_MMA_EXPR(e2, Number);
-      return;
-    }
-
-  if(e1.index() == MMA_EXPR_Polynomial && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Polynomial) /= AS_MMA_EXPR(e2, Number);
-      return;
-    }
-
-  if(e1.index() == MMA_EXPR_Linear_Combination_Of_Functions
-     && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Linear_Combination_Of_Functions)
-        /= AS_MMA_EXPR(e2, Number);
-      return;
-    }
-
-  RUNTIME_ERROR("parse_MMA_expr_divide unexpected error : e1.index() = ",
-                e1.index(), " e2.index() = ", e2.index());
+  std::visit(
+    overloaded{
+      [&](El::BigFloat &arg1, const El::BigFloat &arg2) { arg1 /= arg2; },
+      [&](Polynomial &arg1, const El::BigFloat &arg2) { arg1 /= arg2; },
+      [&](Linear_Combination_Of_Mathematica_Functions &arg1,
+          const El::BigFloat &arg2) { arg1 /= arg2; },
+      [&](auto &arg1, const auto &arg2) {
+        RUNTIME_ERROR("Cannot divide expressions of types: ",
+                      typeid(arg1).name(), " ", typeid(arg2).name());
+      }},
+    e1, e2);
 }
 void Mathematica_Parser::parse_MMA_expr_power(MMA_EXPR &e1, const MMA_EXPR &e2)
 {
-  if(e1.index() == MMA_EXPR_Number && e2.index() == MMA_EXPR_Number)
-    {
-      AS_MMA_EXPR(e1, Number)
-        = to_BigFloat(pow(to_Boost_Float(AS_MMA_EXPR(e1, Number)),
-                          to_Boost_Float(AS_MMA_EXPR(e2, Number))));
-      return;
-    }
-
-  RUNTIME_ERROR("parse_MMA_expr_power unexpected error : e1.index() = ",
-                e1.index(), " e2.index() = ", e2.index());
+  std::visit(
+    overloaded{
+      [&](El::BigFloat &arg1, const El::BigFloat &arg2) {
+        arg1 = to_BigFloat(pow(to_Boost_Float(arg1), to_Boost_Float(arg2)));
+      },
+      [&](auto &arg1, const auto &arg2) {
+        RUNTIME_ERROR("Cannot calculate power for expressions of types: ",
+                      typeid(arg1).name(), " ", typeid(arg2).name());
+      }},
+    e1, e2);
 }
 void Mathematica_Parser::parse_MMA_expr_single_operate(
   std::list<MMA_ELEMENT> &chain, std::list<MMA_ELEMENT>::iterator it) const
