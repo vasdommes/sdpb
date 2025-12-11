@@ -19,7 +19,7 @@ namespace
   //   = p_{j, r, s}(x)*reduced_prefactor_j(x)
   //   p is polynomial
   // How to build it:
-  // - divide (c-B.y)_{j,r,s,k} by reduced_prefactor_j(x_k) * pv_j_r(x_k) * pv_j_s(x_k)
+  // - divide (c-B.y)_{j,r,s,k} by reduced_prefactor_j(x_k)
   // - for each {j,r,s}, build interpolating polynomial p_{j,r,s}(x), degree = (num_points - 1)
   Simple_Matrix<Boost_Polynomial> get_interpolated_polynomial_matrix(
     const El::Matrix<El::BigFloat> &c_minus_By_block, const PVM_Info &pvm,
@@ -70,7 +70,6 @@ namespace
     const auto width = interpolated_poly_matrix.Width();
     ASSERT_EQUAL(height, width);
 
-    std::optional<std::vector<Boost_Float>> pv;
     const auto scale = reduced_prefactor.evaluate(x);
 
     El::Matrix<El::BigFloat> result(height, width);
@@ -79,8 +78,6 @@ namespace
         {
           Boost_Float value
             = interpolated_poly_matrix(i, j).evaluate(x) * scale;
-          if(pv.has_value())
-            value *= pv->at(i) * pv->at(j);
           result(i, j) = to_BigFloat(value);
         }
     return El::Determinant(result);
