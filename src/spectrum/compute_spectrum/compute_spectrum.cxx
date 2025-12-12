@@ -1,14 +1,15 @@
-#include "spectrum/Zeros.hxx"
 #include "compute_lambda.hxx"
 #include "pmp/PMP_Info.hxx"
+#include "sdpb_util/Boost_Float.hxx"
 #include "sdpb_util/Timers/Timers.hxx"
+#include "spectrum/Zeros.hxx"
 
 #include <filesystem>
 #include <vector>
 
 std::vector<El::BigFloat>
 find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
-           const PVM_Info &pvm, const El::BigFloat &threshold,
+           const PVM_Info &pvm, const Boost_Float &threshold,
            const El::BigFloat &max_zero, Timers &timers);
 
 void write_profiling(const std::filesystem::path &spectrum_output_path,
@@ -18,7 +19,7 @@ std::vector<Zeros>
 compute_spectrum(const PMP_Info &pmp,
                  const std::vector<El::Matrix<El::BigFloat>> &c_minus_By,
                  const std::optional<std::vector<El::Matrix<El::BigFloat>>> &x,
-                 const El::BigFloat &threshold, const El::BigFloat &max_zero,
+                 const Boost_Float &threshold, const El::BigFloat &max_zero,
                  const bool &need_lambda, const Verbosity &verbosity,
                  const std::filesystem::path &output_path, Timers &timers)
 {

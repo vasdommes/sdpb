@@ -10,7 +10,7 @@
 
 namespace fs = std::filesystem;
 
-void handle_arguments(const int &argc, char **argv, El::BigFloat &threshold,
+void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       El::BigFloat &max_zero, fs::path &pmp_info_path,
                       fs::path &solution_dir, fs::path &c_minus_By_path,
                       fs::path &output_path, bool &need_lambda,
@@ -47,8 +47,7 @@ void handle_arguments(const int &argc, char **argv, El::BigFloat &threshold,
     "The precision, in the number of bits, for numbers in the "
     "computation. ");
   options.add_options()(
-    "maxZero,m",
-    po::value<std::string>(&max_zero_string)->default_value("0"),
+    "maxZero,m", po::value<std::string>(&max_zero_string)->default_value("0"),
     "Spectrum will ignore all zeros larger than --maxZero. "
     "--maxZero=0 means no limit.");
   options.add_options()("lambda",
@@ -93,7 +92,7 @@ void handle_arguments(const int &argc, char **argv, El::BigFloat &threshold,
   // Set parameters
   {
     Environment::set_precision(precision);
-    threshold = El::BigFloat(threshold_string);
+    threshold = Boost_Float(threshold_string);
     max_zero = El::BigFloat(max_zero_string);
     if(c_minus_By_path.empty())
       c_minus_By_path = solution_dir / "c_minus_By" / "c_minus_By.json";

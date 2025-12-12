@@ -62,7 +62,7 @@ namespace
     return interpolation_matrix;
   }
 
-  El::BigFloat eval_determinant(
+  Boost_Float eval_determinant(
     const Simple_Matrix<Boost_Polynomial> &interpolated_poly_matrix,
     const Damped_Rational &reduced_prefactor, const Boost_Float &x)
   {
@@ -70,17 +70,18 @@ namespace
     const auto width = interpolated_poly_matrix.Width();
     ASSERT_EQUAL(height, width);
 
-    const auto scale = reduced_prefactor.evaluate(x);
-
-    El::Matrix<El::BigFloat> result(height, width);
+    El::Matrix<El::BigFloat> poly_values(height, width);
     for(int i = 0; i < height; ++i)
       for(int j = 0; j < width; ++j)
         {
-          Boost_Float value
-            = interpolated_poly_matrix(i, j).evaluate(x) * scale;
-          result(i, j) = to_BigFloat(value);
+          poly_values(i, j)
+            = to_BigFloat(interpolated_poly_matrix(i, j).evaluate(x));
         }
-    return El::Determinant(result);
+
+    const auto det = to_Boost_Float(El::Determinant(poly_values));
+    // Multiply each element by chi, so that det is multiplied by chi^N
+    const auto chi = reduced_prefactor.evaluate(x);
+    return det * pow(chi, height);
   }
 
   template <class T> T get_midpoint(const T &a, const T &b)
@@ -166,7 +167,7 @@ namespace
 
 std::vector<El::BigFloat>
 find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
-           const PVM_Info &pvm, const El::BigFloat &threshold,
+           const PVM_Info &pvm, const Boost_Float &threshold,
            const El::BigFloat &max_zero, Timers &timers)
 {
   Scoped_Timer timer(timers, "find_zeros");
@@ -193,7 +194,7 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
 
       El::HermitianEig(El::UpperOrLowerNS::LOWER, block, eigenvalues,
                        hermitian_eig_ctrl);
-      auto min_eigenvalue = El::Min(eigenvalues);
+      auto min_eigenvalue = to_Boost_Float(El::Min(eigenvalues));
       ASSERT(min_eigenvalue > -threshold, "All eigenvalues must be positive!",
              DEBUG_STRING(min_eigenvalue), DEBUG_STRING(threshold));
       if(min_eigenvalue < threshold)
@@ -244,6 +245,8 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
   for(size_t i = 0; i < minima.size(); ++i)
     {
       const auto &x = minima.at(i);
+      // TODO: what if y (or its neighbor) is infinite or NaN?
+      // This is possible e.g. if x=0 and prefactor has pole at x=0.
       const auto y = eval(x);
 
       bool is_zero = false;

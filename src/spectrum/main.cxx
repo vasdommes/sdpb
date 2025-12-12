@@ -1,12 +1,14 @@
 #include "Zeros.hxx"
 #include "pmp/PMP_Info.hxx"
 #include "sdp_solve/sdp_solve.hxx"
+#include "sdpb_util/Boost_Float.hxx"
+#include "sdpb_util/Boost_Float.hxx"
 
 #include <filesystem>
 
 namespace fs = std::filesystem;
 
-void handle_arguments(const int &argc, char **argv, El::BigFloat &threshold,
+void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       El::BigFloat &max_zero, fs::path &pmp_info_path,
                       fs::path &solution_dir, fs::path &c_minus_By_path,
                       fs::path &output_path, bool &need_lambda,
@@ -27,7 +29,7 @@ std::vector<Zeros>
 compute_spectrum(const PMP_Info &pmp_info,
                  const std::vector<El::Matrix<El::BigFloat>> &c_minus_By,
                  const std::optional<std::vector<El::Matrix<El::BigFloat>>> &x,
-                 const El::BigFloat &threshold, const El::BigFloat &max_zero,
+                 const Boost_Float &threshold, const El::BigFloat &max_zero,
                  const bool &need_lambda, const Verbosity &verbosity,
                  const std::filesystem::path &spectrum_output_path,
                  Timers &timers);
@@ -45,7 +47,7 @@ int main(int argc, char **argv)
 
   try
     {
-      El::BigFloat threshold;
+      Boost_Float threshold;
       El::BigFloat max_zero;
       fs::path pmp_info_path, solution_dir, output_path, c_minus_By_path;
       bool need_lambda;
