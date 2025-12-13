@@ -1,42 +1,11 @@
 #include "sdpb_util/assert.hxx"
 #include "sdpb_util/Timers/Timers.hxx"
+#include "sdpb_util/json/Json_Writer.hxx"
 #include "spectrum/Zeros.hxx"
-#include "sdpb_util/ostream/set_stream_precision.hxx"
 
-#include <rapidjson/ostreamwrapper.h>
-#include <rapidjson/prettywriter.h>
-
-#include <filesystem>
+#include <fstream>
 
 namespace fs = std::filesystem;
-
-// Helper class to simplify writing JSON
-// TBaseWriter is rapidjson::Writer<...> or rapidjson::PrettyWriter<...>
-// TODO move to sdpb_util, reuse for write_pmp_info and save_c_minus_By
-template <class TBaseWriter> class Json_BigFloat_Writer : public TBaseWriter
-{
-public:
-  template <class... TArgs>
-  explicit Json_BigFloat_Writer(TArgs &&...args)
-      : TBaseWriter(std::forward<TArgs>(args)...)
-  { set_stream_precision(ss); }
-
-  auto BigFloat(const El::BigFloat &value)
-  {
-    ss.str({});
-    ss << value;
-    return this->String(ss.str().c_str());
-  }
-
-private:
-  // Reusable stream for writing BigFloats
-  std::stringstream ss;
-};
-
-using Json_Writer
-  = Json_BigFloat_Writer<rapidjson::Writer<rapidjson::OStreamWrapper>>;
-using Json_PrettyWriter
-  = Json_BigFloat_Writer<rapidjson::PrettyWriter<rapidjson::OStreamWrapper>>;
 
 void write_file(const fs::path &output_path,
                 const std::vector<Zeros> &zeros_blocks, Timers &timers)
