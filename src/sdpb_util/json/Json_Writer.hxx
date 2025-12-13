@@ -24,6 +24,14 @@ public:
   auto BigFloat(const El::BigFloat &value) { return BigFloat_impl(value); }
   auto BigFloat(const Boost_Float &value) { return BigFloat_impl(value); }
 
+  template <class TFloat> auto BigFloatArray(const std::vector<TFloat> &arr)
+  {
+    this->StartArray();
+    for(const auto &value : arr)
+      BigFloat(value);
+    return this->EndArray();
+  }
+
 private:
   // Reusable stream for writing BigFloats
   std::stringstream ss;

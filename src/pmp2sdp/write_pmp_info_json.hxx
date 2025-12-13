@@ -17,19 +17,6 @@ inline void write_pmp_info_json(std::ostream &output_stream,
   rapidjson::OStreamWrapper ows(output_stream);
   Json_Writer writer(ows);
 
-  auto add_bigFloat_array = [&](const std::vector<El::BigFloat> &value) {
-    writer.StartArray();
-    for(auto &p : value)
-      writer.BigFloat(p);
-    writer.EndArray();
-  };
-  auto add_Boost_Float_array = [&](const std::vector<Boost_Float> &value) {
-    writer.StartArray();
-    for(auto &p : value)
-      writer.BigFloat(p);
-    writer.EndArray();
-  };
-
   writer.StartArray();
   for(const auto &block : pmp_info)
     {
@@ -55,7 +42,7 @@ inline void write_pmp_info_json(std::ostream &output_stream,
         writer.Key("base");
         writer.BigFloat(block.prefactor.base);
         writer.Key("poles");
-        add_Boost_Float_array(block.prefactor.poles);
+        writer.BigFloatArray(block.prefactor.poles);
         writer.EndObject();
       }
       writer.Key("reducedPrefactor");
@@ -66,15 +53,15 @@ inline void write_pmp_info_json(std::ostream &output_stream,
         writer.Key("base");
         writer.BigFloat(block.reduced_prefactor.base);
         writer.Key("poles");
-        add_Boost_Float_array(block.reduced_prefactor.poles);
+        writer.BigFloatArray(block.reduced_prefactor.poles);
         writer.EndObject();
       }
       writer.Key("samplePoints");
-      add_bigFloat_array(block.sample_points);
+      writer.BigFloatArray(block.sample_points);
       writer.Key("sampleScalings");
-      add_bigFloat_array(block.sample_scalings);
+      writer.BigFloatArray(block.sample_scalings);
       writer.Key("reducedSampleScalings");
-      add_bigFloat_array(block.reduced_sample_scalings);
+      writer.BigFloatArray(block.reduced_sample_scalings);
       writer.EndObject();
     }
 
