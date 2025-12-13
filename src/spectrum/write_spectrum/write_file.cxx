@@ -49,14 +49,15 @@ void write_file(const fs::path &output_path,
 
               writer.Key("lambda");
               const auto &lambda = zero.lambda;
-              if(lambda.Height() > 0)
-                {
-                  ASSERT_EQUAL(lambda.Width(), 1,
-                               "lambda should contain a single eigenvector!");
-                }
               writer.StartArray();
-              for(int row = 0; row < lambda.Height(); ++row)
-                writer.BigFloat(lambda(row, 0));
+              // Print each column, i.e. each eigenvector
+              for(int col = 0; col < lambda.Width(); ++col)
+                {
+                  writer.StartArray();
+                  for(int row = 0; row < lambda.Height(); ++row)
+                    writer.BigFloat(lambda(row, col));
+                  writer.EndArray();
+                }
               writer.EndArray();
             }
             writer.EndObject();
