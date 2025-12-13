@@ -12,6 +12,7 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       El::BigFloat &max_zero, fs::path &pmp_info_path,
                       fs::path &solution_dir, fs::path &c_minus_By_path,
                       fs::path &output_path, bool &need_lambda,
+                      std::optional<El::BigFloat> &min_eigenvalue_ratio,
                       Verbosity &verbosity);
 
 PMP_Info
@@ -30,7 +31,9 @@ compute_spectrum(const PMP_Info &pmp_info,
                  const std::vector<El::Matrix<El::BigFloat>> &c_minus_By,
                  const std::optional<std::vector<El::Matrix<El::BigFloat>>> &x,
                  const Boost_Float &threshold, const El::BigFloat &max_zero,
-                 const bool &need_lambda, const Verbosity &verbosity,
+                 const bool &need_lambda,
+                 const std::optional<El::BigFloat> &min_eigenvalue_ratio,
+                 const Verbosity &verbosity,
                  const std::filesystem::path &spectrum_output_path,
                  Timers &timers);
 
@@ -51,10 +54,11 @@ int main(int argc, char **argv)
       El::BigFloat max_zero;
       fs::path pmp_info_path, solution_dir, output_path, c_minus_By_path;
       bool need_lambda;
+      std::optional<El::BigFloat> min_eigenvalue_ratio;
       Verbosity verbosity;
       handle_arguments(argc, argv, threshold, max_zero, pmp_info_path,
                        solution_dir, c_minus_By_path, output_path, need_lambda,
-                       verbosity);
+                       min_eigenvalue_ratio, verbosity);
 
       // Print command line
       if(verbosity >= Verbosity::debug && El::mpi::Rank() == 0)
@@ -81,9 +85,9 @@ int main(int argc, char **argv)
       if(verbosity >= Verbosity::debug)
         create_profiling_dir(output_path);
 
-      const auto zeros_blocks
-        = compute_spectrum(pmp_info, c_minus_By, x, threshold, max_zero,
-                           need_lambda, verbosity, output_path, timers);
+      const auto zeros_blocks = compute_spectrum(
+        pmp_info, c_minus_By, x, threshold, max_zero, need_lambda,
+        min_eigenvalue_ratio, verbosity, output_path, timers);
 
       write_spectrum(output_path, zeros_blocks, pmp_info, timers);
 

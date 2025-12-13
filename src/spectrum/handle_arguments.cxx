@@ -7,6 +7,7 @@
 
 #include <boost/program_options.hpp>
 #include <filesystem>
+#include <optional>
 
 namespace fs = std::filesystem;
 
@@ -14,11 +15,12 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       El::BigFloat &max_zero, fs::path &pmp_info_path,
                       fs::path &solution_dir, fs::path &c_minus_By_path,
                       fs::path &output_path, bool &need_lambda,
+                      std::optional<El::BigFloat> &min_eigenvalue_ratio,
                       Verbosity &verbosity)
 {
   int precision;
   std::string threshold_string, max_zero_string, mesh_threshold_string,
-    format_string;
+    format_string, min_eigenvalue_ratio_string;
 
   namespace po = boost::program_options;
 
@@ -53,6 +55,12 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
   options.add_options()("lambda",
                         po::value<bool>(&need_lambda)->default_value(true),
                         "If true, compute Λ and its associated error.");
+  options.add_options()(
+    "minEigenvalueRatio", po::value<std::string>(&min_eigenvalue_ratio_string),
+    "When computing Λ, keep only eigenvalues larger than "
+    "minEigenvalueRatio * max(eigenvalues).\n"
+    "To filter out numerical noise, set this value "
+    "somewhat higher than dualityGap of your SDPB solution.");
   options.add_options()(
     "verbosity",
     po::value<Verbosity>(&verbosity)->default_value(Verbosity::regular),
@@ -96,6 +104,8 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
     max_zero = El::BigFloat(max_zero_string);
     if(c_minus_By_path.empty())
       c_minus_By_path = solution_dir / "c_minus_By" / "c_minus_By.json";
+    if(variables_map.count("minEigenvalueRatio") != 0)
+      min_eigenvalue_ratio.emplace(min_eigenvalue_ratio_string);
   }
 
   // Asserts and warnings
@@ -126,6 +136,29 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                  "--solution directory does not exist: ", solution_dir);
           ASSERT(fs::is_directory(solution_dir),
                  "--solution is not a directory: ", solution_dir);
+        }
+
+      if(min_eigenvalue_ratio.has_value())
+        {
+          if(!need_lambda)
+            {
+              PRINT_WARNING(
+                "--minEigenvalueRatio will be ignored since --lambda=false");
+            }
+
+          ASSERT(min_eigenvalue_ratio.value() >= 0
+                   && min_eigenvalue_ratio.value() <= 1,
+                 "--minEigenvalueRatio=", min_eigenvalue_ratio_string,
+                 " should be in range [0,1].");
+        }
+      else
+        {
+          // TODO: shall we pick some default value?
+          // e.g. --threshold or sqrt(dualityGap)?
+          // TODO in principle, we don't need it for 1x1 blocks.
+          // Shall we print warning instead? This is convenient may lead to silent failures.
+          ASSERT(!need_lambda,
+                 "--minEigenvalueRatio is required when --lambda=true");
         }
 
       ASSERT(fs::exists(c_minus_By_path), DEBUG_STRING(c_minus_By_path));

@@ -20,7 +20,9 @@ compute_spectrum(const PMP_Info &pmp,
                  const std::vector<El::Matrix<El::BigFloat>> &c_minus_By,
                  const std::optional<std::vector<El::Matrix<El::BigFloat>>> &x,
                  const Boost_Float &threshold, const El::BigFloat &max_zero,
-                 const bool &need_lambda, const Verbosity &verbosity,
+                 const bool &need_lambda,
+                 const std::optional<El::BigFloat> &min_eigenvalue_ratio,
+                 const Verbosity &verbosity,
                  const std::filesystem::path &output_path, Timers &timers)
 {
   Scoped_Timer timer(timers, "compute_spectrum");
@@ -46,7 +48,7 @@ compute_spectrum(const PMP_Info &pmp,
             {
               ASSERT(x.has_value());
               compute_lambda(pvm_info, x->at(local_block_index), zero_values,
-                             spectrum_block, timers);
+                             min_eigenvalue_ratio, spectrum_block, timers);
             }
           else
             {
