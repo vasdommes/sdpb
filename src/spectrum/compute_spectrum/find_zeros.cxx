@@ -8,6 +8,7 @@
 
 std::vector<El::BigFloat>
 find_real_positive_minima_sorted(const Boost_Polynomial &polynomial,
+                                 const El::BigFloat &min_zero_distance,
                                  Timers &timers);
 
 namespace
@@ -168,7 +169,8 @@ namespace
 std::vector<El::BigFloat>
 find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
            const PVM_Info &pvm, const Boost_Float &threshold,
-           const El::BigFloat &max_zero, Timers &timers)
+           const El::BigFloat &max_zero, const El::BigFloat &min_zero_distance,
+           Timers &timers)
 {
   Scoped_Timer timer(timers, "find_zeros");
   ASSERT(threshold > 0, DEBUG_STRING(threshold));
@@ -215,7 +217,8 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
   const auto det
     = determinant(interpolated_poly_matrix, pvm.sample_points, timers);
   std::vector<El::BigFloat> minima;
-  for(auto &x : find_real_positive_minima_sorted(det, timers))
+  for(auto &x :
+      find_real_positive_minima_sorted(det, min_zero_distance, timers))
     {
       // Remove large zeros
       if(max_zero > 0 && x > max_zero)

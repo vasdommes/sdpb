@@ -12,15 +12,16 @@
 namespace fs = std::filesystem;
 
 void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
-                      El::BigFloat &max_zero, fs::path &pmp_info_path,
-                      fs::path &solution_dir, fs::path &c_minus_By_path,
-                      fs::path &output_path, bool &need_lambda,
+                      El::BigFloat &max_zero, El::BigFloat &min_zero_distance,
+                      fs::path &pmp_info_path, fs::path &solution_dir,
+                      fs::path &c_minus_By_path, fs::path &output_path,
+                      bool &need_lambda,
                       std::optional<El::BigFloat> &min_eigenvalue_ratio,
                       Verbosity &verbosity)
 {
   int precision;
-  std::string threshold_string, max_zero_string, mesh_threshold_string,
-    format_string, min_eigenvalue_ratio_string;
+  std::string threshold_string, max_zero_string, min_zero_distance_string,
+    mesh_threshold_string, format_string, min_eigenvalue_ratio_string;
 
   namespace po = boost::program_options;
 
@@ -52,6 +53,12 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
     "maxZero,m", po::value<std::string>(&max_zero_string)->default_value("0"),
     "Spectrum will ignore all zeros larger than --maxZero. "
     "--maxZero=0 means no limit.");
+  options.add_options()(
+    // TODO: set default distance finite value, e.g. 2^{-precision/2}?
+    "minZeroDistance",
+    po::value<std::string>(&min_zero_distance_string)->default_value("0"),
+    "Several zeros within --minZeroDistance from each other "
+    "are replaced with their arithmetic mean. ");
   options.add_options()("lambda",
                         po::value<bool>(&need_lambda)->default_value(true),
                         "If true, compute Λ and its associated error.");
@@ -102,6 +109,7 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
     Environment::set_precision(precision);
     threshold = Boost_Float(threshold_string);
     max_zero = El::BigFloat(max_zero_string);
+    min_zero_distance = El::BigFloat(min_zero_distance_string);
     if(c_minus_By_path.empty())
       c_minus_By_path = solution_dir / "c_minus_By" / "c_minus_By.json";
     if(variables_map.count("minEigenvalueRatio") != 0)
@@ -111,6 +119,9 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
   // Asserts and warnings
   if(El::mpi::Rank() == 0)
     {
+      ASSERT(max_zero >= 0, "--maxZero must be non-negative");
+      ASSERT(min_zero_distance >= 0, "--minZeroDistance must be non-negative");
+
       if(variables_map.count("format") != 0)
         {
           PRINT_WARNING("--format option is obsolete. Input file format is "
