@@ -184,8 +184,32 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
   if(pvm.sample_points.size() == 1)
     {
       Scoped_Timer const_timer(timers, "constant_constraint");
-      // El::HermitianEig modifies input matrix, so we have to make a copy
-      auto block = c_minus_By_block;
+
+      // c - B.y is a vector, we need to reshape it into a (dim x dim) matrix.
+      // We reuse get_interpolated_polynomial_matrix() to build it.
+      // In this case the interpolation matrix contains 0-degree polynomials:
+      // interpolated_poly_matrix[r,s] = (c - B.y)[rs,1] / scale
+      // where scale is reduced_sample_scaling at x_0.
+      const auto interpolated_poly_matrix
+        = get_interpolated_polynomial_matrix(c_minus_By_block, pvm, timers);
+      const auto dim = pvm.dim;
+      ASSERT_EQUAL(interpolated_poly_matrix.Height(), dim);
+      ASSERT_EQUAL(interpolated_poly_matrix.Width(), dim);
+
+      El::Matrix<El::BigFloat> block(dim, dim);
+      const auto &x = pvm.sample_points.front();
+      ASSERT_EQUAL(pvm.reduced_sample_scalings.size(), 1);
+      const auto &scale = pvm.reduced_sample_scalings.front();
+      for(int i = 0; i < dim; ++i)
+        {
+          for(int j = 0; j < dim; ++j)
+            {
+              const auto value
+                = interpolated_poly_matrix(i, j).evaluate(to_Boost_Float(x));
+              // NB: restore scaling removed in get_interpolated_polynomial_matrix()
+              block.Set(i, j, to_BigFloat(value) * scale);
+            }
+        }
 
       El::Matrix<El::BigFloat> eigenvalues;
       // Parameter tuning - copied from src/sdp_solve/SDP_Solver/run/step/step_length/min_eigenvalue.cxx
