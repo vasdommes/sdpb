@@ -240,8 +240,12 @@ TEST_CASE("end-to-end_tests")
     INFO("maximize (-y) s.t. (1 + x^4 + y * (x^4 / 12 + x^2)) >= 0) for "
          "x=2/3, x=4/3, and x>=2");
     INFO("SDPB should find primal-dual optimal solution.");
-    INFO("Spectrum should find isolated zero for the last block "
-         "(corresponding to x=4/3).");
+    INFO("Spectrum should find isolated zeros for all blocks corresponding to "
+         "x = 4/3.\n"
+         "Filenames for such blocks have the form "
+         "'constant_x=4%3_dim=$DIM_rank=$RANK.json'.\n"
+         "Number of eigenvectors in \"lambda\" is equal to $RANK, "
+         "and the length if each vector equals $DIM.");
     End_To_End_Test test("1d-isolated-zeros");
     test.default_sdpb_args = boost::program_options::split_unix(
       "--checkpointInterval 3600 --maxRuntime 1340 "
