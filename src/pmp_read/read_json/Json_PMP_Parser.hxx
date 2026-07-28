@@ -51,7 +51,8 @@ public:
   //   for Json_PMP_Parser<PMP_Simpleboot_Parsing_Context>
   template <class... TArgs>
   Json_PMP_Parser(
-    const bool should_parse_objective, const bool should_parse_normalization,
+    const int64_t max_num_poles, const bool should_parse_objective,
+    const bool should_parse_normalization,
     const std::function<bool(size_t matrix_index)> &should_parse_matrix,
     const std::function<void(PMP_File_Parse_Result &&result)> &on_parsed,
     TArgs &&...args)
@@ -94,6 +95,7 @@ public:
           [&should_parse_matrix](size_t index) {
             return !should_parse_matrix(index);
           },
+          max_num_poles,
           std::forward<TArgs>(args)...)
   {}
 

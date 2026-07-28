@@ -20,7 +20,7 @@ int main(int argc, char **argv)
         El::Output("pvm2sdp is DEPRECATED, please use pmp2sdp instead.");
       // TODO remove pvm2sdp in 2.8.0 release
 
-      Block_File_Format output_format = bin;
+      Block_File_Format output_format = Block_File_Format::bin;
       int precision;
       std::vector<fs::path> input_files;
       fs::path output_path;
@@ -34,8 +34,10 @@ int main(int argc, char **argv)
 
       Timers timers(env, verbosity);
 
-      auto pmp
-        = read_polynomial_matrix_program(env, input_files, verbosity, timers);
+      // If you want to set this parameter, use pmp2sdp
+      constexpr int64_t max_num_poles = -1;
+      auto pmp = read_polynomial_matrix_program(
+        env, input_files, max_num_poles, verbosity, timers);
       Output_SDP sdp(pmp, command_arguments, timers);
       bool zip = false;
       write_sdp(output_path, sdp, pmp, output_format, zip, timers, verbosity);

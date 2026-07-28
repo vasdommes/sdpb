@@ -18,7 +18,7 @@ DampedRational[const_, poles_, base_, a_ /; FreeQ[a, x]] :=
     const base^a/Product[a - p, {p, poles}];
 
 DampedRational/:x DampedRational[const_, poles_ /; MemberQ[poles, 0], base_, x] :=
-    DampedRational[const, DeleteCases[poles, 0], base, x];
+    DampedRational[const, DeleteCases[poles, 0, 1, 1], base, x];
 
 DampedRational/:DampedRational[c1_,p1_,b1_,x] DampedRational[c2_,p2_,b2_,x] :=
     DampedRational[c1 c2, Join[p1, p2], b1 b2, x];
@@ -102,6 +102,7 @@ Module[
 <|
   "prefactor" -> toJsonDampedRational[pmp[["prefactor"]],prec],
   "reducedPrefactor" -> toJsonDampedRational[pmp[["reducedPrefactor"]],prec],
+  "maxNumPoles" -> pmp[["maxNumPoles"]],
   "polynomials" -> Map[polynomialToJson[#,prec] &, pmp[["polynomials"]], {3}],
   "samplePoints" -> toJsonNumberArray[sampleData[["samplePoints"]],prec],
   "sampleScalings" -> toJsonNumberArray[sampleData[["sampleScalings"]],prec],

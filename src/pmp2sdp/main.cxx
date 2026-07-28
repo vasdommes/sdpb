@@ -63,7 +63,7 @@ int main(int argc, char **argv)
         }
 
       auto pmp = read_polynomial_matrix_program(
-        env, input_files, parameters.verbosity, timers, simpleboot_parameters);
+        env, input_files, parameters.max_num_poles, parameters.verbosity, timers, simpleboot_parameters);
 
       Output_SDP sdp(pmp, parameters.command_arguments, timers);
       write_sdp(parameters.output_path, sdp, pmp, parameters.output_format,

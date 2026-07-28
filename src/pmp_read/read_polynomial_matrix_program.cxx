@@ -209,10 +209,11 @@ namespace
 Polynomial_Matrix_Program
 read_polynomial_matrix_program(const Environment &env,
                                const fs::path &input_file,
+                               const int64_t max_num_poles,
                                const Verbosity &verbosity, Timers &timers)
 {
   return read_polynomial_matrix_program(env, std::vector{input_file},
-                                        verbosity, timers);
+                                        max_num_poles, verbosity, timers);
 }
 
 // Read Polynomal Matrix Program in one of the supported formats.
@@ -226,8 +227,11 @@ read_polynomial_matrix_program(const Environment &env,
 // TODO: since IO is often a bottleneck, we can reduce it:
 //   root of each group copies file content to a shared memory window,
 //   and other processes read it.
-Polynomial_Matrix_Program read_polynomial_matrix_program(
-  const Environment &env, const std::vector<fs::path> &input_files,
+Polynomial_Matrix_Program
+read_polynomial_matrix_program(
+  const Environment &env,
+  const std::vector<fs::path> &input_files,
+  const int64_t max_num_poles,
   const Verbosity &verbosity, Timers &timers,
   const std::optional<Simpleboot_Parameters> &simpleboot_parameters)
 {
@@ -292,8 +296,8 @@ Polynomial_Matrix_Program read_polynomial_matrix_program(
         bool should_parse_normalization = mapping.mpi_comm.value.Rank() == 0;
 
         auto file_parse_result = PMP_File_Parse_Result::read(
-          file, should_parse_objective, should_parse_normalization,
-          should_parse_matrix, simpleboot_context);
+          file, max_num_poles, should_parse_objective,
+          should_parse_normalization, should_parse_matrix, simpleboot_context);
 
         num_matrices_in_group += file_parse_result.num_matrices;
 

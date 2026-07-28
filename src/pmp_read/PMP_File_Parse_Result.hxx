@@ -35,8 +35,8 @@ public:
   static void validate(const PMP_File_Parse_Result &result);
 
   static PMP_File_Parse_Result
-  read(const std::filesystem::path &input_path, bool should_parse_objective,
-       bool should_parse_normalization,
+  read(const std::filesystem::path &input_path, int64_t max_num_poles,
+       bool should_parse_objective, bool should_parse_normalization,
        const std::function<bool(size_t matrix_index)> &should_parse_matrix,
        const std::shared_ptr<PMP_Simpleboot_Parsing_Context<>>
          &simpleboot_context);
@@ -45,8 +45,8 @@ public:
 
   PMP_File_Parse_Result(const PMP_File_Parse_Result &other) = delete;
   PMP_File_Parse_Result(PMP_File_Parse_Result &&other) noexcept = default;
-  PMP_File_Parse_Result &operator=(const PMP_File_Parse_Result &other)
-    = delete;
-  PMP_File_Parse_Result &operator=(PMP_File_Parse_Result &&other) noexcept
-    = default;
+  PMP_File_Parse_Result &
+  operator=(const PMP_File_Parse_Result &other) = delete;
+  PMP_File_Parse_Result &
+  operator=(PMP_File_Parse_Result &&other) noexcept = default;
 };

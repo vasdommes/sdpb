@@ -8,7 +8,7 @@
 
 Polynomial_Matrix_Program read_polynomial_matrix_program(
   const Environment &env,
-  const std::vector<std::filesystem::path> &input_files,
+  const std::vector<std::filesystem::path> &input_files, int64_t max_num_poles,
   const Verbosity &verbosity, Timers &timers,
   const std::optional<Simpleboot_Parameters> &simpleboot_parameters
   = std::nullopt);
@@ -16,6 +16,7 @@ Polynomial_Matrix_Program read_polynomial_matrix_program(
 Polynomial_Matrix_Program
 read_polynomial_matrix_program(const Environment &env,
                                const std::filesystem::path &input_file,
+                               int64_t max_num_poles,
                                const Verbosity &verbosity, Timers &timers);
 
 std::vector<std::filesystem::path>

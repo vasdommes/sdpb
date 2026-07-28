@@ -8,11 +8,14 @@
 #pragma once
 
 #include "sdpb_util/assert.hxx"
+#include "sdpb_util/Boost_Float.hxx"
 
 #include <El.hpp>
 
 #include <vector>
 #include <boost/math/tools/polynomial.hpp>
+
+using Boost_Polynomial = boost::math::tools::polynomial<Boost_Float>;
 
 // FIXME: Use boost::math::tools::polynomial instead
 
@@ -198,7 +201,7 @@ inline void swap(Polynomial_Vector &polynomials,
   for(auto &elements : elements_vector)
     {
       polynomials.emplace_back();
-      std::swap(polynomials.back().coefficients, elements);
+      swap(polynomials.back().coefficients, elements);
     }
 }
 

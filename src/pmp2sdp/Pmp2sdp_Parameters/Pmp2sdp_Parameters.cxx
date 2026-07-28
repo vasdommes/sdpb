@@ -31,6 +31,12 @@ Pmp2sdp_Parameters::Pmp2sdp_Parameters(int argc, char **argv)
     "The precision, in the number of bits, for numbers in the "
     "computation. ");
   options.add_options()(
+    "maxNumPoles,n", po::value<int64_t>(&max_num_poles)->default_value(-1),
+    "Maximum number of poles in reducedPrefactor (-1 means unlimited).\n"
+    "pmp2sdp will keep up to maxNumPoles rightmost poles in reducedPrefactor, "
+    "which is used for interpolating the PMP.\n"
+    "See https://arxiv.org/abs/2509.14307, Section 4.3 for details.");
+  options.add_options()(
     "outputFormat,f",
     po::value<Block_File_Format>(&output_format)
       ->default_value(Block_File_Format::bin),
@@ -109,6 +115,7 @@ boost::property_tree::ptree to_property_tree(const Pmp2sdp_Parameters &p)
   result.put("parameter", p.simpleboot_param_file.string());
   result.put("output", p.output_path.string());
   result.put("precision", p.precision);
+  result.put("maxNumPoles", p.max_num_poles);
   result.put("outputFormat", p.output_format);
   result.put("zip", p.zip);
   result.put("verbosity", static_cast<int>(p.verbosity));
