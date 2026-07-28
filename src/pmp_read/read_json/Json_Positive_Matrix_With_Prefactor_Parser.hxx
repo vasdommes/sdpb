@@ -42,14 +42,19 @@ public:
     skip, [this](auto &&value) { this->element_name = std::move(value); },    \
     [] {}, std::forward<TArgs>(float_parser_args)...)
 
+#define SIMPLE_ELEMENT_PARSER_CTOR(element_name)                              \
+  element_name##_parser(                                                      \
+    skip, [this](auto &&value) { this->element_name = std::move(value); })
+
         ELEMENT_PARSER_CTOR(polynomials),
         ELEMENT_PARSER_CTOR(prefactor),
         ELEMENT_PARSER_CTOR(reduced_prefactor),
-        ELEMENT_PARSER_CTOR(max_num_poles),
+        SIMPLE_ELEMENT_PARSER_CTOR(max_num_poles),
         ELEMENT_PARSER_CTOR(sample_points),
         ELEMENT_PARSER_CTOR(sample_scalings),
         ELEMENT_PARSER_CTOR(reduced_sample_scalings),
 
+#undef SIMPLE_ELEMENT_PARSER_CTOR
 #undef ELEMENT_PARSER_CTOR
 
         bilinear_basis_parser(

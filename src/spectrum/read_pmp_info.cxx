@@ -20,8 +20,8 @@ class Json_PVM_Info_Parser final : public Abstract_Json_Object_Parser<PVM_Info>
   Json_UInt64_Parser block_index_parser;
   Json_String_Parser block_path_parser;
   Json_UInt64_Parser dim_parser;
-  Json_Damped_Rational_Parser prefactor_parser;
-  Json_Damped_Rational_Parser reduced_prefactor_parser;
+  Json_Damped_Rational_Parser<Json_Boost_Float_Parser> prefactor_parser;
+  Json_Damped_Rational_Parser<Json_Boost_Float_Parser> reduced_prefactor_parser;
   Json_Vector_Parser<Json_BigFloat_Parser> sample_points_parser;
   Json_Vector_Parser<Json_BigFloat_Parser> sample_scalings_parser;
   Json_Vector_Parser<Json_BigFloat_Parser> reduced_sample_scalings_parser;
@@ -48,7 +48,10 @@ public:
   {}
 
 public:
-  value_type get_result() override { return result; }
+  value_type get_result() override
+  {
+    return result;
+  }
 
 protected:
   Abstract_Json_Reader_Handler &element_parser(const std::string &key) override
@@ -89,7 +92,10 @@ public:
     sample_scalings_parser.reset(skip);
     reduced_sample_scalings_parser.reset(skip);
   }
-  void clear_result() override { result = PVM_Info(); }
+  void clear_result() override
+  {
+    result = PVM_Info();
+  }
 };
 
 PMP_Info read_pmp_info(const std::filesystem::path &input_path, Timers &timers)
