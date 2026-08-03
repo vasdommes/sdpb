@@ -300,42 +300,42 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
       // TODO: what if y (or its neighbor) is infinite or NaN?
       // This is possible e.g. if x=0 and prefactor has pole at x=0.
 
-      bool is_zero = false;
-      if(i == 0)
-        {
-          if(minima.size() > 1)
-            {
-              const auto x_right = get_midpoint(x, minima.at(i + 1));
-              is_zero = is_zero_one_sided(x, x_right);
-            }
-          else
-            {
-              // This is a case of single minimum.
-              // TODO: which points should we choose for comparison?
-              // It's not obvious, choosing x/2 is not justified well.
-              auto x_other = x / 2;
-              if(x_other == El::BigFloat(0))
-                {
-                  // Special case: if x=0, we take the first nonzero sample point.
-                  x_other = pvm.sample_points.at(0);
-                  if(x_other == El::BigFloat(0))
-                    x_other = pvm.sample_points.at(1);
-                }
-              ASSERT(x_other > 0);
-              is_zero = is_zero_one_sided(x, x_other);
-            }
-        }
-      else if(i + 1 == minima.size())
-        {
-          const auto x_left = get_midpoint(x, minima.at(i - 1));
-          is_zero = is_zero_one_sided(x, x_left);
-        }
-      else
-        {
-          const auto x_left = get_midpoint(x, minima.at(i - 1));
-          const auto x_right = get_midpoint(x, minima.at(i + 1));
-          is_zero = is_zero_two_sided(x, x_left, x_right);
-        }
+      const bool is_zero = [&] {
+        // First zero candidate
+        if(i == 0)
+          {
+            if(minima.size() > 1)
+              {
+                const auto x_right = get_midpoint(x, minima.at(i + 1));
+                return is_zero_one_sided(x, x_right);
+              }
+            // This is a case of single minimum.
+            // TODO: which points should we choose for comparison?
+            // It's not obvious, choosing x/2 is not justified well.
+            auto x_other = x / 2;
+            if(x_other == El::BigFloat(0))
+              {
+                // Special case: if x=0, we take the first nonzero sample point.
+                // Note that we have at least two sample points:
+                // constant constraints are handled separately (see above).
+                x_other = pvm.sample_points.at(0);
+                if(x_other == El::BigFloat(0))
+                  x_other = pvm.sample_points.at(1);
+              }
+            ASSERT(x_other > 0);
+            return is_zero_one_sided(x, x_other);
+          }
+        // Last zero candidate
+        if(i + 1 == minima.size())
+          {
+            const auto x_left = get_midpoint(x, minima.at(i - 1));
+            return is_zero_one_sided(x, x_left);
+          }
+        // Regular case, check left and right neighbors
+        const auto x_left = get_midpoint(x, minima.at(i - 1));
+        const auto x_right = get_midpoint(x, minima.at(i + 1));
+        return is_zero_two_sided(x, x_left, x_right);
+      }();
 
       if(is_zero)
         zeros.emplace_back(x);
