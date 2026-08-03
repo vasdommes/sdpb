@@ -268,13 +268,37 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
                             to_Boost_Float(x));
   };
 
+  const auto is_zero_one_sided
+    = [&](const El::BigFloat &x, const El::BigFloat &x_other) {
+        const auto y = eval(x);
+        const auto y_other = eval(x_other);
+        const auto ratio = y / y_other;
+        ASSERT(!isnan(ratio), "Cannot check for zero: det(c-By)=", y,
+               " at x=", x, ", det(c-By)=", y_other, " at x=", x_other);
+        return ratio < threshold;
+      };
+
+  // TODO should it simply return
+  // is_zero_one_sided(x, x_left) && is_zero_one_sided(x, x_right)?
+  const auto is_zero_two_sided
+    = [&](const El::BigFloat &x, const El::BigFloat &x_left,
+          const El::BigFloat &x_right) {
+        const auto y = eval(x);
+        const auto y_left = eval(x_left);
+        const auto y_right = eval(x_right);
+        const auto ratio_squared = y * y / y_left / y_right;
+        ASSERT(!isnan(ratio_squared), "Cannot check for zero: det(c-By)=", y,
+               " at x=", x, ", det(c-By)=", y_left, " at x=", x_left,
+               ", det(c-By)=", y_right, " at x=", x_right);
+        return ratio_squared < threshold * threshold;
+      };
+
   Scoped_Timer check_minima_timer(timers, "check_minima");
   for(size_t i = 0; i < minima.size(); ++i)
     {
       const auto &x = minima.at(i);
       // TODO: what if y (or its neighbor) is infinite or NaN?
       // This is possible e.g. if x=0 and prefactor has pole at x=0.
-      const auto y = eval(x);
 
       bool is_zero = false;
       if(i == 0)
@@ -282,8 +306,7 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
           if(minima.size() > 1)
             {
               const auto x_right = get_midpoint(x, minima.at(i + 1));
-              const auto y_right = eval(x_right);
-              is_zero = y / y_right < threshold;
+              is_zero = is_zero_one_sided(x, x_right);
             }
           else
             {
@@ -299,24 +322,19 @@ find_zeros(const El::Matrix<El::BigFloat> &c_minus_By_block,
                     x_other = pvm.sample_points.at(1);
                 }
               ASSERT(x_other > 0);
-
-              const auto y_other = eval(x_other);
-              is_zero = y / y_other < threshold;
+              is_zero = is_zero_one_sided(x, x_other);
             }
         }
       else if(i + 1 == minima.size())
         {
           const auto x_left = get_midpoint(x, minima.at(i - 1));
-          const auto y_left = eval(x_left);
-          is_zero = y / y_left < threshold;
+          is_zero = is_zero_one_sided(x, x_left);
         }
       else
         {
           const auto x_left = get_midpoint(x, minima.at(i - 1));
-          const auto y_left = eval(x_left);
           const auto x_right = get_midpoint(x, minima.at(i + 1));
-          const auto y_right = eval(x_right);
-          is_zero = y * y / y_left / y_right < threshold * threshold;
+          is_zero = is_zero_two_sided(x, x_left, x_right);
         }
 
       if(is_zero)
