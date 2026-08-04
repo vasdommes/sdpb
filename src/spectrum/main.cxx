@@ -2,9 +2,6 @@
 #include "pmp/PMP_Info.hxx"
 #include "sdp_solve/sdp_solve.hxx"
 #include "sdpb_util/Boost_Float.hxx"
-#include "sdpb_util/Boost_Float.hxx"
-#include "sdpb_util/Boost_Float.hxx"
-#include "sdpb_util/Boost_Float.hxx"
 
 #include <filesystem>
 
@@ -17,6 +14,11 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       bool &need_lambda,
                       std::optional<El::BigFloat> &min_eigenvalue_ratio,
                       Verbosity &verbosity);
+
+std::optional<El::BigFloat>
+default_min_eigenvalue_ratio(const std::filesystem::path &solution_dir,
+                             const PMP_Info &pmp_info,
+                             const Verbosity &verbosity, Timers &timers);
 
 PMP_Info
 read_pmp_info(const std::filesystem::path &input_path, Timers &timers);
@@ -81,7 +83,14 @@ int main(int argc, char **argv)
 
       std::optional<std::vector<El::Matrix<El::BigFloat>>> x;
       if(need_lambda)
-        x.emplace(read_x(solution_dir, pmp_info, timers));
+        {
+          x.emplace(read_x(solution_dir, pmp_info, timers));
+          if(!min_eigenvalue_ratio.has_value())
+            {
+              min_eigenvalue_ratio = default_min_eigenvalue_ratio(
+                solution_dir, pmp_info, verbosity, timers);
+            }
+        }
 
       const auto c_minus_By
         = read_c_minus_By(c_minus_By_path, pmp_info, timers);

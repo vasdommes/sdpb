@@ -143,7 +143,8 @@ namespace
                 {"--pmpInfo", sdp_path + "/pmp_info.json"},
                 {"--solution", (output_dir / "out").string()},
                 {"--threshold", "1e-10"},
-                {"--minEigenvalueRatio", "1e-10"},
+                // minEigenvalueRatio is set automatically to sqrt(dualityGap). TODO: set it manually for some test cases?
+                // {"--minEigenvalueRatio", "1e-10"},
                 {"--output", (output_dir / "spectrum.json").string()},
                 {"--precision", std::to_string(precision)},
                 {"--verbosity", "debug"},
@@ -335,8 +336,8 @@ TEST_CASE("end-to-end_tests")
       INFO("Same as primal_dual_optimal_reduced, but with --maxNumPoles 14.");
       INFO("NB: pmp contains blocks with maxNumPoles from 11 to 17.");
       INFO("The resulting SDP blocks will have numPoles from 11 to 14.");
-      End_To_End_Test test(
-        "SingletScalar_cT_test_nmax6/primal_dual_optimal_reduced_max_num_poles_14");
+      End_To_End_Test test("SingletScalar_cT_test_nmax6/"
+                           "primal_dual_optimal_reduced_max_num_poles_14");
       test.default_sdpb_args = default_sdpb_args;
       test.pmp2sdp_args = {{"--maxNumPoles", "14"}};
       test.run();

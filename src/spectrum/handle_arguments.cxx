@@ -67,7 +67,8 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
     "When computing Λ, keep only eigenvalues larger than "
     "minEigenvalueRatio * max(eigenvalues).\n"
     "To filter out numerical noise, set this value "
-    "somewhat higher than dualityGap of your SDPB solution.");
+    "somewhat higher than dualityGap of your SDPB solution.\n"
+    "By default, --minEigenvalueRatio=sqrt(dualityGap).");
   options.add_options()(
     "verbosity",
     po::value<Verbosity>(&verbosity)->default_value(Verbosity::regular),
@@ -161,15 +162,6 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                    && min_eigenvalue_ratio.value() <= 1,
                  "--minEigenvalueRatio=", min_eigenvalue_ratio_string,
                  " should be in range [0,1].");
-        }
-      else
-        {
-          // TODO: shall we pick some default value?
-          // e.g. --threshold or sqrt(dualityGap)?
-          // TODO in principle, we don't need it for 1x1 blocks.
-          // Shall we print warning instead? This is convenient may lead to silent failures.
-          ASSERT(!need_lambda,
-                 "--minEigenvalueRatio is required when --lambda=true");
         }
 
       ASSERT(fs::exists(c_minus_By_path), DEBUG_STRING(c_minus_By_path));

@@ -190,7 +190,7 @@ SDPB writes out by default.
 Another thing that you can do now that you have a solution is to extract the spectrum.
 As a simple example, extracting the spectrum from the toy example would be
 
-    mpirun -n 4 build/spectrum --pmpInfo=test/data/end-to-end_tests/1d/output/sdp/pmp_info.json --output=test/out/spectrum/1d/pmp.json/spectrum.json --precision=768 --solution=test/data/end-to-end_tests/1d/output/out --threshold=1e-10 --minEigenvalueRatio=1e-10
+    mpirun -n 4 build/spectrum --pmpInfo=test/data/end-to-end_tests/1d/output/sdp/pmp_info.json --output=test/out/spectrum/1d/pmp.json/spectrum.json --precision=768 --solution=test/data/end-to-end_tests/1d/output/out --threshold=1e-10
 
 This will output the spectra into `test/out/spectrum/1d/spectrum.json` and should look like
 
@@ -234,8 +234,9 @@ where $\vec{v}_{j,x}$ is given by Eq. (A.7) in [arxiv:1612.08471](https://arxiv.
 and $\chi_j^\prime(x)$ is a `reducedPrefactor` from pmp.json (see [SDPB Manual](SDPB_Manual/SDPB-Manual.pdf) for PMP format description).
 Note that this definition disagrees with Eq. (A.8) in [arxiv:1612.08471](https://arxiv.org/abs/1612.08471), which is incorrect.
 
-Due to numerical errors,  $V_{j,\tau}$ can have small non-zero eigenvalues `~ O(dualityGap) * max_eigenvalue`.
-To filter them out, make sure that `--minEigenvalueRatio` is much larger than `dualityGap` of your SDPB solution.
+Due to numerical errors, $V_{j,\tau}$ can have small non-zero eigenvalues `~ O(dualityGap) * max_eigenvalue`.
+To filter them out, you may use the option `--minEigenvalueRatio`.
+By default, `spectrum` will set `--minEigenvalueRatio` to `sqrt(dualityGap)`.
 
 ## Common issues and workarounds
 

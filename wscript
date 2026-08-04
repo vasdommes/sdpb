@@ -273,6 +273,7 @@ def build(bld):
     bld.program(source=['src/spectrum/main.cxx',
                         'src/spectrum/handle_arguments.cxx',
                         'src/spectrum/read_c_minus_By.cxx',
+                        'src/spectrum/default_min_eigenvalue_ratio.cxx',
                         'src/spectrum/read_pmp_info.cxx',
                         'src/spectrum/read_x.cxx',
                         'src/spectrum/write_profiling.cxx',
