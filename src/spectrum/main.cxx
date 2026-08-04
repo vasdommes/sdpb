@@ -75,7 +75,6 @@ int main(int argc, char **argv)
           std::cout << std::endl;
         }
 
-      // TODO use timers, print profiling data for --verbosity=debug
       Timers timers(env, verbosity);
       Scoped_Timer timer(timers, "spectrum");
       const auto pmp_info = read_pmp_info(pmp_info_path, timers);
