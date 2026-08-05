@@ -217,6 +217,25 @@ compute_lambda(const PVM_Info &pvm_info, const El::Matrix<El::BigFloat> &x,
         const auto large_eigenvalues = eigenvalues(large_range, El::ALL);
         lambdas = El::LockedView(eigenvectors, El::ALL, large_range);
 
+        const auto sqrt_chi_inv
+          = 1
+            / El::Sqrt(to_BigFloat(pvm_info.reduced_prefactor.evaluate(
+              to_Boost_Float(zeros.back().zero))));
+
+        // Below, we multiply lambda by 1 / sqrt(\chi) after updating error_matrix.
+        // If this factor is zero, then we should treat lambda as zero form the start,
+        // i.e. error_matrix should not change.
+        // Then, user will potentially get large error value indicating that something went wrong.
+        // See discussion in https://github.com/davidsd/sdpb/issues/287
+        if(sqrt_chi_inv == El::BigFloat(0))
+          {
+            PRINT_WARNING("block_", pvm_info.block_index,
+                          ", x=", zeros.back().zero,
+                          ": reduced_prefactor=inf, lambda will be set to 0");
+            El::Zero(lambdas);
+            continue;
+          }
+
         for(int index = 0; index < num_large_eigenvals; ++index)
           {
             // Single eigenvector
@@ -242,10 +261,7 @@ compute_lambda(const PVM_Info &pvm_info, const El::Matrix<El::BigFloat> &x,
             // With this definition, lambda does not change
             // if one adds reducedPrefactor != prefactor to PMP.json
             // NB: this is different from Python script and from (A.8) definition!
-            lambda
-              *= 1
-                 / El::Sqrt(to_BigFloat(pvm_info.reduced_prefactor.evaluate(
-                   to_Boost_Float(zeros.back().zero))));
+            lambda *= sqrt_chi_inv;
           }
       }
     }
