@@ -238,6 +238,13 @@ Due to numerical errors, $V_{j,\tau}$ can have small non-zero eigenvalues `~ O(d
 To filter them out, you may use the option `--minEigenvalueRatio`.
 By default, `spectrum` will set `--minEigenvalueRatio` to `sqrt(dualityGap)`.
 
+`spectrum` detects zeros by checking conditions like `f(x) / f(x_1) < threshold`.
+You may adjust its sensitivity by changing the option `--threshold`. By default, it is set to `sqrt(dualityGap)`.
+
+If you get several zeros close to each other and want to replace them with a single zero, increase `--minZeroDistance`.
+
+If `spectrum` finds a large unphysical zero, set `--maxZero` to a lower value to exclude it.
+
 ## Common issues and workarounds
 
 ### SDPB is slow, how many cores should I use for optimal performance?
@@ -315,7 +322,3 @@ and/or
 ```
 export OMP_NUM_THREADS=1
 ```
-
-### Spectrum does not find zeros
-
-Try to set `--threshold` option for `spectrum` larger than `--dualityGapThreshold` for `sdpb`.
