@@ -11,7 +11,8 @@
 
 namespace fs = std::filesystem;
 
-void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
+void handle_arguments(const int &argc, char **argv,
+                      std::optional<Boost_Float> &threshold,
                       El::BigFloat &max_zero, El::BigFloat &min_zero_distance,
                       fs::path &pmp_info_path, fs::path &solution_dir,
                       fs::path &c_minus_By_path, fs::path &output_path,
@@ -41,8 +42,9 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
     "Path to c_minus_By.json with the block vector (c - B.y). "
     "By default, equals to '${--solution}/c_minus_By/c_minus_By.json'.");
   options.add_options()(
-    "threshold", po::value<std::string>(&threshold_string)->required(),
-    "Threshold for when a functional is considered to be zero.");
+    "threshold", po::value<std::string>(&threshold_string),
+    "Threshold for when a functional is considered to be zero.\n"
+    "By default, --threshold=sqrt(dualityGap).");
   options.add_options()(
     "output,o", po::value<fs::path>(&output_path)->required(), "Output file");
   options.add_options()(
@@ -108,7 +110,8 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
   // Set parameters
   {
     Environment::set_precision(precision);
-    threshold = Boost_Float(threshold_string);
+    if(variables_map.count("threshold") != 0)
+      threshold.emplace(Boost_Float(threshold_string));
     max_zero = El::BigFloat(max_zero_string);
     min_zero_distance = El::BigFloat(min_zero_distance_string);
     if(c_minus_By_path.empty())
@@ -140,6 +143,9 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                  "--solution must be specified unless --lambda=false");
           ASSERT(variables_map.count("cMinusBy") != 0,
                  "Please specify either --solution or --cMinusBy");
+          ASSERT(threshold.has_value(),
+                 "To set --threshold automatically, "
+                 "you need to specify --solution directory");
         }
 
       if(variables_map.count("cMinusBy") == 0 || need_lambda)

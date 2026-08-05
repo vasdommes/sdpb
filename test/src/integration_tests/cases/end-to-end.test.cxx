@@ -32,6 +32,7 @@ namespace
     bool check_sdp = true;
     bool check_sdp_normalization = true;
     bool run_sdpb_twice = false;
+    std::vector<std::string> default_spectrum_args;
 
     explicit End_To_End_Test(std::string name) : name(std::move(name)) {}
 
@@ -142,15 +143,16 @@ namespace
               Named_Args_Map args{
                 {"--pmpInfo", sdp_path + "/pmp_info.json"},
                 {"--solution", (output_dir / "out").string()},
-                {"--threshold", "1e-10"},
-                // minEigenvalueRatio is set automatically to sqrt(dualityGap). TODO: set it manually for some test cases?
+                // threshold and minEigenvalueRatio are set automatically to sqrt(dualityGap).
+                // {"--threshold", "1e-10"},
                 // {"--minEigenvalueRatio", "1e-10"},
                 {"--output", (output_dir / "spectrum.json").string()},
                 {"--precision", std::to_string(precision)},
                 {"--verbosity", "debug"},
               };
               runner.create_nested("spectrum")
-                .mpi_run({"build/spectrum", args}, num_procs);
+                .mpi_run({"build/spectrum", default_spectrum_args, args},
+                         num_procs);
 
               // Cannot check block paths if the same spectrum.json
               // is generated several times by different PMP inputs,
@@ -318,6 +320,10 @@ TEST_CASE("end-to-end_tests")
       test.check_sdp_normalization = true;
       // run_sdpb_twice=true to test checkpoint loading, see https://github.com/davidsd/sdpb/issues/219
       test.run_sdpb_twice = true;
+      // In other tests, --threshold and --minEigenvalueRatio are set automatically to sqrt(dualityGap).
+      // Here we set them manually to test spectrum argument parsing.
+      test.default_spectrum_args = boost::program_options::split_unix(
+        "--threshold 1e-10 --minEigenvalueRatio 1e-10");
       test.run();
     }
 

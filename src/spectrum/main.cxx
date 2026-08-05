@@ -7,7 +7,8 @@
 
 namespace fs = std::filesystem;
 
-void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
+void handle_arguments(const int &argc, char **argv,
+                      std::optional<Boost_Float> &threshold,
                       El::BigFloat &max_zero, El::BigFloat &min_zero_distance,
                       fs::path &pmp_info_path, fs::path &solution_dir,
                       fs::path &c_minus_By_path, fs::path &output_path,
@@ -15,10 +16,11 @@ void handle_arguments(const int &argc, char **argv, Boost_Float &threshold,
                       std::optional<El::BigFloat> &min_eigenvalue_ratio,
                       Verbosity &verbosity);
 
-std::optional<El::BigFloat>
-default_min_eigenvalue_ratio(const std::filesystem::path &solution_dir,
-                             const PMP_Info &pmp_info,
-                             const Verbosity &verbosity, Timers &timers);
+void set_default_parameters(const std::filesystem::path &solution_dir,
+                            const PMP_Info &pmp_info, const bool &need_lambda,
+                            const Verbosity &verbosity, Timers &timers,
+                            std::optional<Boost_Float> &threshold,
+                            std::optional<El::BigFloat> &min_eigenvalue_ratio);
 
 PMP_Info
 read_pmp_info(const std::filesystem::path &input_path, Timers &timers);
@@ -56,7 +58,7 @@ int main(int argc, char **argv)
 
   try
     {
-      Boost_Float threshold;
+      std::optional<Boost_Float> threshold;
       El::BigFloat max_zero;
       El::BigFloat min_zero_distance;
       fs::path pmp_info_path, solution_dir, output_path, c_minus_By_path;
@@ -81,16 +83,13 @@ int main(int argc, char **argv)
       Scoped_Timer timer(timers, "spectrum");
       const auto pmp_info = read_pmp_info(pmp_info_path, timers);
 
+      // Set --threshold and --minEigenvalueRatio to sqrt(dualityGap), if needed.
+      set_default_parameters(solution_dir, pmp_info, need_lambda, verbosity,
+                             timers, threshold, min_eigenvalue_ratio);
+
       std::optional<std::vector<El::Matrix<El::BigFloat>>> x;
       if(need_lambda)
-        {
-          x.emplace(read_x(solution_dir, pmp_info, timers));
-          if(!min_eigenvalue_ratio.has_value())
-            {
-              min_eigenvalue_ratio = default_min_eigenvalue_ratio(
-                solution_dir, pmp_info, verbosity, timers);
-            }
-        }
+        x.emplace(read_x(solution_dir, pmp_info, timers));
 
       const auto c_minus_By
         = read_c_minus_By(c_minus_By_path, pmp_info, timers);
@@ -99,9 +98,11 @@ int main(int argc, char **argv)
       if(verbosity >= Verbosity::debug)
         create_profiling_dir(output_path);
 
+      ASSERT(threshold.has_value(), "--threshold must be specified!");
       const auto zeros_blocks = compute_spectrum(
-        pmp_info, c_minus_By, x, threshold, max_zero, min_zero_distance,
-        need_lambda, min_eigenvalue_ratio, verbosity, output_path, timers);
+        pmp_info, c_minus_By, x, threshold.value(), max_zero,
+        min_zero_distance, need_lambda, min_eigenvalue_ratio, verbosity,
+        output_path, timers);
 
       write_spectrum(output_path, zeros_blocks, pmp_info, timers);
 
