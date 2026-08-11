@@ -1,63 +1,19 @@
 #include "Test_Case_Runner.hxx"
 #include "Test_Config.hxx"
+#include "process.hxx"
+#include "sdpb_util/assert.hxx"
 
 #include <fstream>
+#include <boost/algorithm/string/join.hpp>
 
 namespace fs = std::filesystem;
-
-namespace
-{
-  // concatenate args with " " separator
-  inline void build_args_stream(std::ostringstream &) {}
-  template <typename T, typename... ArgPack>
-  void build_args_stream(std::ostringstream &os, const T &item,
-                         const ArgPack &...args)
-  {
-    os << item << " ";
-    build_args_stream(os, args...);
-  }
-
-  // concatenate args with " " separator
-  inline std::string build_args_string(const std::string &arg) { return arg; }
-  template <typename... ArgPack>
-  std::string build_args_string(const ArgPack &...args)
-  {
-    std::ostringstream os;
-    build_args_stream(os, args...);
-    return os.str();
-  }
-
-  template <typename... Ts> std::string build_command_line(const Ts &...args)
-  {
-    return build_args_string(args...);
-  }
-
-  // mpirun -n 2
-  std::string build_mpirun_prefix(int numProcs)
-  {
-    return build_command_line(Test_Config::mpirun, "-n",
-                              std::to_string(numProcs));
-  }
-
-  std::string build_string_from_named_args(
-    const Test_Util::Test_Case_Runner::Named_Args_Map &named_args)
-  {
-    std::stringstream ss;
-    for(const auto &[key, value] : named_args)
-      {
-        ss << " " << key;
-        if(!value.empty())
-          ss << "=" << value;
-      }
-    return ss.str();
-  }
-}
 
 namespace Test_Util
 {
   // NB: name should be a valid path relative to test_log_dir
   Test_Case_Runner::Test_Case_Runner(const std::string &name)
-      : name(name), data_dir(Test_Config::test_data_dir / name),
+      : name(name),
+        data_dir(Test_Config::test_data_dir / name),
         output_dir(Test_Config::test_output_dir / name),
         stdout_path(Test_Config::test_log_dir
                     / fs::path(name + ".stdout.log")),
@@ -66,13 +22,11 @@ namespace Test_Util
     fs::remove_all(output_dir);
     fs::remove_all(Test_Config::test_log_dir / name);
 
-    fs::create_directories(stdout_path.parent_path());
-    if(!fs::is_directory(stdout_path.parent_path()))
-      {
-        throw std::runtime_error(
-          stdout_path.parent_path().string()
-          + " is not a directory! Check file name and permissions.");
-      }
+    if(stdout_path.has_parent_path())
+      fs::create_directories(stdout_path.parent_path());
+    ASSERT(fs::is_directory(stdout_path.parent_path()),
+           stdout_path.parent_path(),
+           " is not a directory! Check file name and permissions.");
   }
 
   Test_Case_Runner
@@ -82,38 +36,38 @@ namespace Test_Util
     return Test_Case_Runner(name + separator + suffix);
   }
 
-  void
-  Test_Case_Runner::run(const std::string &command, int required_exit_code,
-                        const std::string &required_error_msg) const
+  void Test_Case_Runner::run(const Command &command, int required_exit_code,
+                             const std::string &required_error_msg) const
   {
-    namespace bp = boost::process;
-
     CAPTURE(command);
     CAPTURE(stdout_path);
     CAPTURE(stderr_path);
 
+    // int exit_code = bp::system(command, bp::std_out > stdout_path.string(),
+    //                            bp::std_err > stderr_path.string());
+    int exit_code = run_command(command, {stdin, stdout_path, stderr_path});
+    // NB: We need separate stderr output to process stderr_string.
+    // TODO: ideally, we want to redirect bp::std_err to both stdout_path and stderr_path
+    // instead of appending stderr to the end ot stdout.
+    // Unfortunately, the following simple solution doesn't do what we need,
+    // since redirections works only for one path:
+    // bp::system(command, (bp::std_out & bp::std_err) > stdout_path, bp::std_err > stderr_path)
+
     std::ofstream os_stdout(stdout_path, std::ios::app);
-    std::ofstream os_stderr(stderr_path, std::ios::app);
-
-    // write command before stdout
+    os_stdout << std::endl << "===Command line===" << std::endl;
     os_stdout << command << std::endl;
+    os_stdout << "===================" << std::endl;
 
-    bp::ipstream stdout_pipe;
-    bp::ipstream stderr_pipe;
-    int exit_code = bp::system(command, bp::std_out > stdout_pipe,
-                               bp::std_err > stderr_pipe);
+    const auto stderr_string = [&] {
+      std::ifstream is_stderr(stderr_path);
+      std::stringstream ss;
+      ss << is_stderr.rdbuf();
+      return ss.str();
+    }();
 
-    // write stdout to file
-    os_stdout << stdout_pipe.rdbuf();
-
-    // write stderr to both stderr and stdout files
-    // we cannot call rdbuf() twice, thus we copy it to stderr_string
-    std::stringstream ss;
-    ss << stderr_pipe.rdbuf();
-    auto stderr_string = ss.str();
-
-    os_stdout << stderr_string;
-    os_stderr << stderr_string;
+    os_stdout << std::endl << "===stderr===" << std::endl;
+    os_stdout << stderr_string << std::endl;
+    os_stdout << "============" << std::endl;
 
     CAPTURE(exit_code);
     CAPTURE(required_exit_code);
@@ -144,53 +98,25 @@ namespace Test_Util
       }
   }
 
-  void Test_Case_Runner::mpi_run(const std::string &command, int numProcs,
-                                 int required_exit_code,
+  void Test_Case_Runner::mpi_run(const Command &command, const int numProcs,
+                                 const int required_exit_code,
                                  const std::string &required_error_msg) const
   {
-    auto mpi_command
-      = build_command_line(build_mpirun_prefix(numProcs), command);
+    auto mpi_command = Test_Config::mpirun;
+    mpi_command += {"-n", std::to_string(numProcs)};
+    mpi_command += command;
     run(mpi_command, required_exit_code, required_error_msg);
-  }
-
-  void Test_Case_Runner::run(const std::vector<std::string> &args,
-                             const Named_Args_Map &named_args,
-                             int required_exit_code,
-                             const std::string &required_error_msg) const
-  {
-    auto args_string = boost::algorithm::join(args, " ");
-    auto named_args_string = build_string_from_named_args(named_args);
-    auto command = build_command_line(args_string, named_args_string);
-    run(command, required_exit_code, required_error_msg);
-  }
-
-  void Test_Case_Runner::mpi_run(const std::vector<std::string> &args,
-                                 const Named_Args_Map &named_args,
-                                 int numProcs, int required_exit_code,
-                                 const std::string &required_error_msg) const
-  {
-    std::vector<std::string> args_with_mpi(args);
-    args_with_mpi.insert(args_with_mpi.begin(), build_mpirun_prefix(numProcs));
-    run(args_with_mpi, named_args, required_exit_code, required_error_msg);
   }
 
   fs::path Test_Case_Runner::unzip_to_temp_dir(const fs::path &zip_path) const
   {
-    auto temp_dir = output_dir;
+    const auto temp_dir = output_dir;
     fs::create_directories(temp_dir);
     static int unique_suffix;
-    auto filename
+    const auto filename
       = zip_path.filename().string() + "." + std::to_string(unique_suffix++);
     auto output_path = temp_dir / filename;
-    auto unzip = boost::process::search_path("unzip");
-    if(unzip.empty())
-      FAIL("Cannot find unzip");
-
-    // control.json may differ by "command" field
-    // thus we exclude this file from comparison
-    auto unzip_command
-      = build_command_line("unzip -o", zip_path, "-d", output_path);
-    run(unzip_command);
+    run({"unzip", {"-o", zip_path, "-d", output_path}});
     return output_path;
   }
 }

@@ -1,0 +1,4 @@
+{
+  "num_blocks": 3,
+  "command": "build/pmp2sdp --input=test/data/pmp2sdp/json/pmp.json --output=test/out/pmp2sdp/json/pmp.json/sdp --precision=512 --verbosity=debug"
+}

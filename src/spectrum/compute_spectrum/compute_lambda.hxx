@@ -1,0 +1,269 @@
+#pragma once
+
+#include "pmp/PMP_Info.hxx"
+#include "sdpb_util/assert.hxx"
+#include "sdpb_util/Timers/Timers.hxx"
+#include "spectrum/Zeros.hxx"
+
+#include <optional>
+
+inline void
+compute_lambda(const PVM_Info &pvm_info, const El::Matrix<El::BigFloat> &x,
+               const std::vector<El::BigFloat> &zero_values,
+               const std::optional<El::BigFloat> &min_eigenvalue_ratio,
+               Zeros &spectrum_block, Timers &timers)
+{
+  Scoped_Timer timer(timers, "compute_lambda");
+
+  const auto num_rows = pvm_info.dim;
+  const auto &sample_points = pvm_info.sample_points;
+
+  auto &zeros = spectrum_block.zeros;
+  auto &error = spectrum_block.error;
+
+  const size_t matrix_block_size(x.Height() / (num_rows * (num_rows + 1) / 2));
+
+  // U_{j,k} in Eq. (A.11)
+  // hereafter equation numbers are from https://arxiv.org/pdf/1612.08471
+  El::Matrix<El::BigFloat> x_scaled_matrix(matrix_block_size,
+                                           (num_rows * (num_rows + 1) / 2));
+  {
+    size_t row_column(0);
+    for(size_t column(0); column != num_rows; ++column)
+      for(size_t row(0); row <= column; ++row)
+        {
+          for(size_t index(0); index != matrix_block_size; ++index)
+            {
+              x_scaled_matrix(index, row_column)
+                = x(row_column * matrix_block_size + index, 0)
+                  * pvm_info.reduced_sample_scalings.at(index);
+            }
+          ++row_column;
+        }
+  }
+  El::Matrix<El::BigFloat> error_matrix(x_scaled_matrix);
+
+  if(zero_values.empty())
+    {
+      error = El::Sqrt(El::Dot(error_matrix, error_matrix));
+      return;
+    }
+
+  // Lagrange interpolation coefficients L(\tau, x_k^{(j)}, Eq. (A.15)
+  El::Matrix<El::BigFloat> interpolation(sample_points.size(),
+                                         zero_values.size());
+  for(size_t point_index(0); point_index != sample_points.size();
+      ++point_index)
+    {
+      for(size_t zero_index(0); zero_index != zero_values.size(); ++zero_index)
+        {
+          auto &product(interpolation(point_index, zero_index));
+          product = 1;
+          for(size_t point_product_index(0);
+              point_product_index != sample_points.size();
+              ++point_product_index)
+            {
+              if(point_index != point_product_index)
+                {
+                  product *= (zero_values[zero_index]
+                              - sample_points[point_product_index])
+                             / (sample_points[point_index]
+                                - sample_points[point_product_index]);
+                }
+            }
+        }
+    }
+
+  // Solve Eq. (A.15) for V using least-squares fit.
+  // roots_fit is L^{-1}
+  El::Matrix<El::BigFloat> roots_fit;
+  {
+    // This is mostly a copy+paste of El::Pseudoinverse.  We need to
+    // set the number of iterations, which is not exposed in the API
+    // for El::Pseudoinverse, but is exposed in El::SVD.
+
+    const El::Int m = interpolation.Height();
+    const El::Int n = interpolation.Width();
+    const El::BigFloat eps = El::limits::Epsilon<El::BigFloat>();
+
+    // Get the SVD
+    El::Matrix<El::BigFloat> s;
+    El::Matrix<El::BigFloat> U, V;
+    El::SVDCtrl<El::BigFloat> ctrl;
+    ctrl.overwrite = true;
+    ctrl.bidiagSVDCtrl.approach = El::COMPACT_SVD;
+    ctrl.bidiagSVDCtrl.tolType = El::RELATIVE_TO_MAX_SING_VAL_TOL;
+    ctrl.bidiagSVDCtrl.tol = El::Max(m, n) * eps;
+    // The default only does 6 iterations per value.  We need far more
+    // because of high precision.
+    ctrl.bidiagSVDCtrl.qrCtrl.maxIterPerVal = 100;
+    El::Matrix<El::BigFloat> interpolation_copy(interpolation);
+    El::SVD(interpolation_copy, U, s, V, ctrl);
+
+    // Scale U with the inverted (nonzero) singular values, U := U / Sigma
+    El::DiagonalSolve(El::RIGHT, El::NORMAL, s, U);
+
+    // Form pinvA = (U Sigma V^H)^H = V (U Sigma)^H
+    El::Gemm(El::NORMAL, El::ADJOINT, El::BigFloat(1), V, U, roots_fit);
+  }
+
+  for(size_t zero_index(0); zero_index != zero_values.size(); ++zero_index)
+    {
+      //  V_{j,\tau} from Eq. (A.15)
+      El::Matrix<El::BigFloat> Lambda(num_rows, num_rows);
+      El::Matrix<El::BigFloat> fit(roots_fit.Height(), 1);
+      size_t row_column(0);
+      for(size_t column(0); column != num_rows; ++column)
+        for(size_t row(0); row <= column; ++row)
+          {
+            El::Matrix<El::BigFloat> roots_view(
+              El::View(roots_fit, zero_index, 0, 1, roots_fit.Width()));
+            El::Matrix<El::BigFloat> Lambda_view(
+              El::View(Lambda, row, column, 1, 1));
+
+            // Lambda_view = V_{j,\tau} = symmetrize( L^{-1}(\tau,x_k^{(j)}) . U_{j,k} )
+            El::Gemv(
+              El::Orientation::NORMAL,
+              (row == column ? El::BigFloat(1.0) : El::BigFloat(0.5)),
+              roots_view,
+              El::View(x_scaled_matrix, 0, row_column, matrix_block_size, 1),
+              El::BigFloat(0.0), Lambda_view);
+            Lambda(column, row) = Lambda(row, column);
+            ++row_column;
+          }
+
+      El::HermitianEigCtrl<El::BigFloat> hermitian_eig_ctrl;
+      /// The default number of iterations is 40.  That is sometimes
+      /// not enough, so we bump it up significantly.
+      hermitian_eig_ctrl.tridiagEigCtrl.dcCtrl.secularCtrl.maxIterations = 400;
+
+      El::Matrix<El::BigFloat> eigenvalues, eigenvectors;
+      El::HermitianEig(El::UpperOrLowerNS::UPPER, Lambda, eigenvalues,
+                       eigenvectors, hermitian_eig_ctrl);
+      // Eigenvalues are sorted, largest at the end.
+
+      ASSERT_EQUAL(Lambda.Height(), eigenvalues.Height(),
+                   "Incorrect number of eigenvalues!",
+                   DEBUG_STRING(zero_index));
+      const size_t num_eigvals(eigenvalues.Height());
+
+      auto max_eigenvalue = eigenvalues(num_eigvals - 1, 0);
+
+      // El::Max has a bug, see https://gitlab.com/bootstrapcollaboration/elemental/-/issues/4
+      // Thus, we'll just compare last eigenvalue with a first one (as a sanity check).
+      // ASSERT_EQUAL(max_eigenvalue, El::Max(eigenvalues),
+      //              "Eigenvalues were not sorted by El::HermitianEig()!");
+      ASSERT(max_eigenvalue >= eigenvalues(0, 0),
+             "Eigenvalues were not sorted by El::HermitianEig()!",
+             DEBUG_STRING(eigenvalues(0, 0)),
+             DEBUG_STRING(eigenvalues(num_eigvals - 1, 0)));
+      if(max_eigenvalue < 0)
+        {
+          PRINT_WARNING("block_", pvm_info.block_index,
+                        ": x=", zero_values.at(zero_index),
+                        ": negative max_eigenvalue=", max_eigenvalue,
+                        " for Lambda matrix will be replaced with 0.");
+          max_eigenvalue = 0;
+        }
+
+      int num_large_eigenvals = 0;
+      if(max_eigenvalue > 0)
+        {
+          for(num_large_eigenvals = 1; num_large_eigenvals < num_eigvals;
+              ++num_large_eigenvals)
+            {
+              const int i = num_eigvals - num_large_eigenvals - 1;
+              const auto val = eigenvalues(i, 0);
+              if(val <= 0)
+                break;
+              // NB: not required for 1x1 matrices
+              ASSERT(
+                min_eigenvalue_ratio.has_value(),
+                "Need to set --minEigenvalueRatio for blocks larger than 1x1");
+              if(val / max_eigenvalue < min_eigenvalue_ratio.value())
+                break;
+            }
+        }
+      {
+        zeros.emplace_back(zero_values[zero_index]);
+        auto &lambdas = zeros.back().lambda;
+        // lambdas = eigenvectors * sqrt(eigenvalues)
+        // lambdas = v_{j,\tau} from Eq. (A.8)
+
+        // If max_eigenvalue == 0, then lambda = 0.
+        // TODO: lambda=0 is unphysical, shall we remove all such zeros and recompute lambdas?
+        // (note that adding/removing any zeros affects all lambdas in a block)
+        if(num_large_eigenvals == 0)
+          {
+            PRINT_WARNING("block_", pvm_info.block_index,
+                          ": x=", zero_values.at(zero_index),
+                          ": nontrivial eigenvectors not found, set lambda=0");
+            lambdas.Resize(num_eigvals, 1);
+            El::Zero(lambdas);
+            continue;
+          }
+
+        // NB: if Lambda == {{0}}, then
+        // El::HermitianEig() returns eigenvalues = {0}
+        // and does not initialize eigenvectors.
+        // This case is treated separately above.
+        ASSERT_EQUAL(eigenvalues.Height(), eigenvectors.Height(),
+                     "Number of eigenvalues and eigenvectors did not match, "
+                     "probably due to eigensolver failure. ",
+                     DEBUG_STRING(zero_index), DEBUG_STRING(max_eigenvalue));
+
+        const El::IR large_range(num_eigvals - num_large_eigenvals,
+                                 num_eigvals);
+        const auto large_eigenvalues = eigenvalues(large_range, El::ALL);
+        lambdas = El::LockedView(eigenvectors, El::ALL, large_range);
+
+        const auto sqrt_chi_inv
+          = 1
+            / El::Sqrt(to_BigFloat(pvm_info.reduced_prefactor.evaluate(
+              to_Boost_Float(zeros.back().zero))));
+
+        // Below, we multiply lambda by 1 / sqrt(\chi) after updating error_matrix.
+        // If this factor is zero, then we should treat lambda as zero form the start,
+        // i.e. error_matrix should not change.
+        // Then, user will potentially get large error value indicating that something went wrong.
+        // See discussion in https://github.com/davidsd/sdpb/issues/287
+        if(sqrt_chi_inv == El::BigFloat(0))
+          {
+            PRINT_WARNING("block_", pvm_info.block_index,
+                          ", x=", zeros.back().zero,
+                          ": reduced_prefactor=inf, lambda will be set to 0");
+            El::Zero(lambdas);
+            continue;
+          }
+
+        for(int index = 0; index < num_large_eigenvals; ++index)
+          {
+            // Single eigenvector
+            auto lambda = lambdas(El::ALL, El::IR(index, index + 1));
+            ASSERT(lambda.Viewing());
+            const auto eigenvalue = large_eigenvalues(index, 0);
+
+            lambda *= El::Sqrt(eigenvalue);
+            size_t row_column(0);
+            for(size_t column(0); column != num_rows; ++column)
+              for(size_t row(0); row <= column; ++row)
+                {
+                  for(size_t index(0); index != matrix_block_size; ++index)
+                    {
+                      error_matrix(index, row_column)
+                        -= interpolation(index, zero_index) * lambda(row)
+                           * lambda(column) * (row == column ? 1 : 2);
+                    }
+                  ++row_column;
+                }
+
+            // Set lambda = 1/sqrt(\chi) * v_{j,\tau}
+            // With this definition, lambda does not change
+            // if one adds reducedPrefactor != prefactor to PMP.json
+            // NB: this is different from Python script and from (A.8) definition!
+            lambda *= sqrt_chi_inv;
+          }
+      }
+    }
+  error = El::Sqrt(El::Dot(error_matrix, error_matrix));
+}

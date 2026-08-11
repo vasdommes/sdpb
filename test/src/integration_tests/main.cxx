@@ -1,14 +1,15 @@
 #include "common.hxx"
+#include "sdpb_util/assert.hxx"
 
 #include <filesystem>
-#include <boost/process.hpp>
 #include <iostream>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
 
 #ifndef CATCH_AMALGAMATED_CUSTOM_MAIN
 #error "To override main, pass '-D CATCH_AMALGAMATED_CUSTOM_MAIN' to compiler"
 #endif
 
-namespace bp = boost::process;
 namespace fs = std::filesystem;
 
 namespace
@@ -19,20 +20,19 @@ namespace
   void set_working_directory()
   {
     // if we find this file, we know where we are
-    auto sdp_zip = "test/data/sdp.zip";
+    const auto sdp_zip = "test/data/sdp.zip";
     for(const fs::path prefix : {".", ".."})
       {
-        if(exists(prefix / "test/data/sdp.zip"))
+        if(exists(prefix / sdp_zip))
           {
             fs::current_path(prefix);
             return;
           }
       }
 
-    auto msg = std::string("Cannot find '") + sdp_zip
-               + "'. Please run test executable from root sdpb/ directory "
-                 "or sdpb/build/ directory";
-    throw std::runtime_error(msg);
+    RUNTIME_ERROR("Cannot find '", sdp_zip,
+                  "'. Please run test executable from root sdpb/ directory "
+                  "or sdpb/build/ directory");
   }
 }
 
@@ -47,10 +47,10 @@ int main(int argc, char *argv[])
 
   // Build a new command line parser on top of Catch2's
   using namespace Catch::Clara;
-  std::string mpirun = "mpirun";
+  std::string mpirun_str = "mpirun";
   // bind mpirun_command variable to a new option --mpirun
   auto cli = session.cli()
-             | Opt(mpirun, "mpirun")["--mpirun"](
+             | Opt(mpirun_str, "mpirun")["--mpirun"](
                "mpirun command, e.g. --mpirun=srun or "
                "--mpirun=\"mpirun --mca btl vader,openib,self\"."
                "By default, --mpirun=mpirun");
@@ -63,16 +63,14 @@ int main(int argc, char *argv[])
   if(returnCode != 0) // Indicates a command line error
     return returnCode;
 
-  // TODO process arguments like --mpirun="mpirun --mca btl vader,openib,self"
-  Test_Config::mpirun = mpirun;
-
+  Test_Config::mpirun = Command::split(mpirun_str);
   // Check if we can run mpirun
-  auto mpirun_help_command = mpirun + " --help";
+  auto mpirun_help = Test_Config::mpirun + "--help";
   std::error_code ec;
-  int check_mpi = bp::system(mpirun_help_command, bp::std_out > bp::null, ec);
+  const int check_mpi = run_command(mpirun_help, {stdin, nullptr, stderr}, ec);
   if(check_mpi != 0)
     {
-      std::cout << "Failed to run MPI: " << mpirun_help_command << std::endl;
+      std::cout << "Failed to run MPI: " << mpirun_help << std::endl;
       if(ec.value() != 0)
         std::cout << "Error code: " << ec << std::endl;
       else
